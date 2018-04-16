@@ -1,0 +1,72 @@
+### commented strings are default value, under this values have been memeory usage optimized parameters ###
+[mysql]
+
+
+[mysqld_safe]
+syslog
+
+[mysqld]
+datadir=/var/lib/mysql
+bind-address=ip2
+port=3306
+#max_connections=20000
+max_connections=400
+default-storage-engine=innodb
+binlog_format=ROW
+collation-server=utf8_general_ci
+init-connect='SET NAMES utf8'
+character-set-server=utf8
+default-storage-engine=innodb
+#log_error=/var/log/mysql/error.log
+skip-external-locking
+skip-name-resolve
+socket = /var/run/mysqld/mysqld.sock
+
+#myisam_sort_buffer_size=64M
+myisam_sort_buffer_size=32M
+wait_timeout=1800
+#open_files_limit=102400
+open_files_limit=10240
+#table_open_cache=10000
+table_open_cache=1000
+#key_buffer_size=64M
+key_buffer_size=32M
+max_allowed_packet=256M
+query_cache_size=0
+query_cache_type=0
+
+innodb_file_format=Barracuda
+innodb_file_per_table=1
+#innodb_buffer_pool_size=3138M
+innodb_buffer_pool_size=128M
+#innodb_log_file_size=627M
+innodb_log_file_size=32M
+innodb_read_io_threads=8
+innodb_write_io_threads=8
+innodb_io_capacity=500
+innodb_flush_log_at_trx_commit=2
+innodb_flush_method=O_DIRECT
+innodb_doublewrite=0
+innodb_autoinc_lock_mode=2
+innodb_locks_unsafe_for_binlog=1
+wsrep_cluster_address="gcomm://ip1:4567,ip2:4567,ip3:4567/?pc.wait_prim=no"
+wsrep_provider=/usr/lib/galera/libgalera_smm.so
+wsrep_cluster_name="openstack"
+
+wsrep_slave_threads=8
+wsrep_sst_method=xtrabackup-v2
+wsrep_sst_auth=root:60ZTvukvpJMQuJjw
+wsrep_node_address=172.16.10.92
+#wsrep_provider_options="gcache.size = 256M"
+wsrep_provider_options="gcache.size = 128M"
+wsrep_provider_options="gmcast.listen_addr = tcp://ip2:4567"
+
+
+
+[xtrabackup]
+parallel=4
+
+[sst]
+streamfmt=xbstream
+transferfmt=socat
+sockopt=,nodelay,sndbuf=1048576,rcvbuf=1048576
