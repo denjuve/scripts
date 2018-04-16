@@ -1,0 +1,11 @@
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name: { list_join: ['-', [get_param: stack_name, 'router']] }
+      external_gateway_info:
+        network: { get_param: public_net }
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: { get_resource: router }
+      subnet: { get_resource: subnet01 }
