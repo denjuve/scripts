@@ -1,0 +1,521 @@
+#!/bin/bash
+
+# Required variables:
+# nodes_os - operating system (centos7, trusty, xenial)
+# node_hostname - hostname of this node (mynode)
+# node_domain - domainname of this node (mydomain)
+# cluster_name - clustername (used to classify this node)
+# config_host - IP/hostname of salt-master
+# instance_cloud_init - cloud-init script for instance
+# saltversion - version of salt
+
+# Redirect all outputs
+exec > >(tee -i /tmp/cloud-init-bootstrap.log) 2>&1
+set -xe
+
+
+export BOOTSTRAP_SCRIPT_URL=$bootstrap_script_url
+export BOOTSTRAP_SCRIPT_URL=${BOOTSTRAP_SCRIPT_URL:-https://raw.githubusercontent.com/salt-formulas/salt-formulas-scripts/master/bootstrap.sh}
+export DISTRIB_REVISION=nightly
+export DISTRIB_REVISION=${DISTRIB_REVISION:-nightly}
+# BOOTSTRAP_EXTRA_REPO_PARAMS variable - list of exatra repos with parameters which have to be added.
+# Format: repo 1, repo priority 1, repo pin 1; repo 2, repo priority 2, repo pin 2;
+export BOOTSTRAP_EXTRA_REPO_PARAMS=""
+
+echo "Environment variables:"
+env
+
+# Send signal to heat wait condition
+# param:
+#   $1 - status to send ("FAILURE" or "SUCCESS"
+#   $2 - msg
+#
+#   AWS parameters:
+# aws_resource
+# aws_stack
+# aws_region
+
+function wait_condition_send() {
+  local status=${1:-SUCCESS}
+  local reason=${2:-empty}
+  local data_binary="{\"status\": \"$status\", \"reason\": \"$reason\"}"
+  echo "Sending signal to wait condition: $data_binary"
+  if [ -z "curl -i -X POST -H 'X-Auth-Token: gAAAAABa8CXSYW-pAwUHUN0IRxMTupr_QoJmqjS6H1ogyFOfIK8sqYKv-ZhbL1bJNjJUMpeoACPePWxQ_rV67MD5hkKazMVsjYgMKZaZJbdR2QMZcoA-rvYbsFXncdX4M4yWOYr7TFFWiJIuKrbZRQ8W7lgTPPhXrFg2MO3bLXoj-EfkqRKUR98' -H 'Content-Type: application/json' -H 'Accept: application/json' https://172.18.184.8:8004/v1/93e58e299bf147b0b1c7bc1a2634fc04/stacks/lab02-mcp_salt_master-s2rhtteivrvi/3bd707f2-70ff-469e-af9e-dd46e14dded1/resources/instance_wait_handle/signal" ]; then
+    # AWS
+  if [ "$status" == "SUCCESS" ]; then
+    aws_status="true"
+    cfn-signal -s "$aws_status" --resource "$aws_resource" --stack "$aws_stack" --region "$aws_region"
+  else
+    aws_status="false"
+    echo cfn-signal -s "$aws_status" --resource "$aws_resource" --stack "$aws_stack" --region "$aws_region"
+    exit 1
+  fi
+  else
+    # Heat
+    curl -i -X POST -H 'X-Auth-Token: gAAAAABa8CXSYW-pAwUHUN0IRxMTupr_QoJmqjS6H1ogyFOfIK8sqYKv-ZhbL1bJNjJUMpeoACPePWxQ_rV67MD5hkKazMVsjYgMKZaZJbdR2QMZcoA-rvYbsFXncdX4M4yWOYr7TFFWiJIuKrbZRQ8W7lgTPPhXrFg2MO3bLXoj-EfkqRKUR98' -H 'Content-Type: application/json' -H 'Accept: application/json' https://172.18.184.8:8004/v1/93e58e299bf147b0b1c7bc1a2634fc04/stacks/lab02-mcp_salt_master-s2rhtteivrvi/3bd707f2-70ff-469e-af9e-dd46e14dded1/resources/instance_wait_handle/signal -k --data-binary "$data_binary"
+  fi
+
+  if [ "$status" == "FAILURE" ]; then
+    exit 1
+  fi
+}
+
+# Add wrapper to apt-get to avoid race conditions
+# with cron jobs running 'unattended-upgrades' script
+aptget_wrapper() {
+  local apt_wrapper_timeout=300
+  local start_time=$(date '+%s')
+  local fin_time=$((start_time + apt_wrapper_timeout))
+  while true; do
+    if (( "$(date '+%s')" > fin_time )); then
+      msg="Timeout exceeded ${apt_wrapper_timeout} s. Lock files are still not released. Terminating..."
+      wait_condition_send "FAILURE" "$msg"
+    fi
+    if fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1; then
+      echo "Waiting while another apt/dpkg process releases locks ..."
+      sleep 30
+      continue
+    else
+      apt-get $@
+      break
+    fi
+  done
+}
+
+add_extra_repo_deb() {
+  local bootstap_params=$1
+  local IFS=';'
+  local param_str
+  local repo_counter=0
+  for param_str in $bootstap_params; do
+    IFS=','
+    local repo_param=($param_str)
+    local repo=${repo_param[0]}
+    local prio=${repo_param[1]}
+    local pin=${repo_param[2]}
+    echo $repo > /etc/apt/sources.list.d/bootstrap_extra_repo_${repo_counter}.list
+    if [ "$prio" != "" ] && [ "$pin" != "" ]; then
+      echo -e "\nPackage: *\nPin: ${pin}\nPin-Priority: ${prio}\n" > /etc/apt/preferences.d/bootstrap_extra_repo_${repo_counter}
+    fi
+    repo_counter=`expr $repo_counter + 1`
+  done
+}
+
+add_extra_repo_rhel() {
+  local bootstap_params=$1
+  local IFS=';'
+  local param_str
+  local repo_counter=0
+  for param_str in $bootstap_params; do
+    IFS=','
+    local repo_param=($param_str)
+    local repo=${repo_param[0]}
+    local prio=${repo_param[1]}
+    echo -e "[bootstrap_extra_repo_${repo_counter}]\nname = bootstrap_extra_repo_${repo_counter}\nbaseurl = $repo\nenabled = 1\ngpgcheck = 0\nsslverify = 0" > /etc/yum.repos.d/bootstrap_extra_repo_${repo_counter}.repo
+    if [ "$prio" != "" ]; then
+      echo "priority=${prio}" >> /etc/yum.repos.d/bootstrap_extra_repo_${repo_counter}.repo
+    fi
+    repo_counter=`expr $repo_counter + 1`
+  done
+}
+
+
+# Set default salt version
+if [ -z "$saltversion" ]; then
+    saltversion="stable 2016.3"
+fi
+echo "Using Salt version $saltversion"
+
+echo "Preparing base OS ..."
+
+case "xenial" in
+    trusty)
+        # workaround for old cloud-init only configuring the first iface
+        iface_config_dir="/etc/network/interfaces"
+        ifaces=$(ip a | awk '/^[1-9]:/ {print $2}' | grep -v "lo:" | rev | cut -c2- | rev)
+
+        for iface in $ifaces; do
+            grep $iface $iface_config_dir &> /dev/null || (echo -e "\nauto $iface\niface $iface inet dhcp" >> $iface_config_dir && ifup $iface)
+        done
+
+        which wget > /dev/null || (aptget_wrapper update; aptget_wrapper install -y wget)
+
+        add_extra_repo_deb "${BOOTSTRAP_EXTRA_REPO_PARAMS}"
+        export MASTER_IP="127.0.0.1" MINION_ID="cfg01.lab02.bud-mk.local"
+        source <(curl -qL ${BOOTSTRAP_SCRIPT_URL})
+        BOOTSTRAP_SALTSTACK_VERSION="$saltversion"
+        BOOTSTRAP_SALTSTACK_OPTS="$BOOTSTRAP_SALTSTACK_VERSION"
+        install_salt_minion_pkg
+
+        ;;
+    xenial)
+
+        # workaround for new cloud-init setting all interfaces statically
+        which resolvconf > /dev/null 2>&1 && systemctl restart resolvconf
+
+        which wget > /dev/null || (aptget_wrapper update; aptget_wrapper install -y wget)
+
+        add_extra_repo_deb "${BOOTSTRAP_EXTRA_REPO_PARAMS}"
+        export MASTER_IP="127.0.0.1" MINION_ID="cfg01.lab02.bud-mk.local"
+        source <(curl -qL ${BOOTSTRAP_SCRIPT_URL})
+        BOOTSTRAP_SALTSTACK_VERSION="$saltversion"
+        BOOTSTRAP_SALTSTACK_OPTS="$BOOTSTRAP_SALTSTACK_VERSION"
+        install_salt_minion_pkg
+
+        ;;
+    rhel|centos|centos7|centos7|rhel6|rhel7)
+        add_extra_repo_rhel "${BOOTSTRAP_EXTRA_REPO_PARAMS}"
+        yum install -y git
+        export MASTER_IP="127.0.0.1" MINION_ID="cfg01.lab02.bud-mk.local"
+        source <(curl -qL ${BOOTSTRAP_SCRIPT_URL})
+        BOOTSTRAP_SALTSTACK_VERSION="$saltversion"
+        install_salt_minion_pkg
+        ;;
+    *)
+        msg="OS 'xenial' is not supported."
+        wait_condition_send "FAILURE" "$msg"
+esac
+
+echo "Configuring Salt minion ..."
+[ ! -d /etc/salt/minion.d ] && mkdir -p /etc/salt/minion.d
+echo -e "id: cfg01.lab02.bud-mk.local\nmaster: 127.0.0.1" > /etc/salt/minion.d/minion.conf
+
+service salt-minion restart || wait_condition_send "FAILURE" "Failed to restart salt-minion service."
+
+if [ -z "$aws_instance_id" ]; then
+  echo "Running instance cloud-init ..."
+  # Required variables:
+# nodes_os - operating system (centos7, trusty, xenial)
+# node_hostname - hostname of this node (mynode)
+# node_domain - domainname of this node (mydomain)
+# cluster_name - clustername, used to classify this node (virtual_mcp11_k8s)
+# config_host - IP/hostname of salt-master (192.168.0.1)
+#
+# private_key - SSH private key, used to clone reclass model
+# reclass_address - address of reclass model (https://github.com/user/repo.git)
+# reclass_branch - branch of reclass model (master)
+
+
+export BOOTSTRAP_SCRIPT_URL=$bootstrap_script_url
+export BOOTSTRAP_SCRIPT_URL=${BOOTSTRAP_SCRIPT_URL:-https://raw.githubusercontent.com/salt-formulas/salt-formulas-scripts/master/bootstrap.sh}
+
+# inherit heat variables
+export RECLASS_ADDRESS=https://gerrit.mcp.mirantis.net/salt-models/mcp-virtual-lab
+export RECLASS_BRANCH=master
+export RECLASS_ROOT=$reclass_root
+export CLUSTER_NAME=os-ha-ovs
+export HOSTNAME=cfg01
+export DOMAIN=lab02.bud-mk.local
+export DISTRIB_REVISION=nightly
+export EXTRA_FORMULAS=""
+# set with default's if not provided at all
+export RECLASS_BRANCH=${RECLASS_BRANCH:-master}
+export RECLASS_ROOT=${RECLASS_ROOT:-/srv/salt/reclass}
+export DISTRIB_REVISION=${DISTRIB_REVISION:-nightly}
+#export DEBUG=${DEBUG:-1}
+
+# get Master IP addresses
+node_ip="$(ip a | awk -v prefix="^    inet 192.168.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_control_ip="$(ip a | awk -v prefix="^    inet 172.16.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+export MASTER_IP=$node_ip
+
+# setup private key
+[ ! -d /root/.ssh ] && mkdir -p /root/.ssh
+if [ "-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAqdHr4zmivHPEimCuK9vtATe4PvGEr0Np/JxYDlEQsr5Cajh4
+tajxmZrjdAnJWFXVbmYl21sN1cUW0ltxB+9+lc4GNVNCZqE4kmpsyx2lrF7xCFvF
+Qou26JYud/UCT9IpCYgWjQIGSC8gq1TzfgOpn6rWnLNSl3WdM5TKtQT7RXIkdSUw
+kXFbObz9lsM+ULWNozCId2osJHj4zE0D3H5odU5DpcWLuSG0MmdxtWoQNJjSiPWt
+HbRdvNmr/xeqcAfzdUdZxGf/VbXDdiNZn9TVv7UxxBHE812KNUf/Cvb5agDfEL7x
+i2bWXbhr4jVTaDVr6MWl8Q7fAj79gdjQnUBWaQIDAQABAoIBAFU3kU6yIna9BViH
+UX+S2ijtRBjZ68JjavEnp4xvo5h+nydcdT57q9lv/0nAi3g3gmXm/oJH+/ZU87HV
+zy+zP+t+umDSChUkPBZFL5jxpKyN7BhMrP1KzRuEGYd6vJE/nfY5g095P5vDgnpX
+o+SNg/YqrY1u8zgr/hnfRaV2/XyIDEEcQXTHseWTnnMQnULFU88xL8yq8ACT5GhK
+7A9m5ukfcU6d/fs/psz5Yqw5IQsWbv1yJ3/FKufPHlo2Nzh3/3eDAZUXvaBgf1so
+FWFpHtkry3OXOGaZ98HgF9hL0twS0pzMvuypdGUQAt6nyB1N5re4LK/MAOddqwEc
+1+NQzfECgYEA2ryEf0GLJdtiYs3F4HbwTwJVIXdyWv7kjYGeMkutzzAjXl6wx8aq
+kfqLJ7x7UkR5unZ1ajEbKBciAlSuFA+Gikn6a4Lv8h87aSnHpPd/2VSitRlI/gW7
+w4U4CL3Br1JyonU5WA7VYfTow7KnHBhdwm27RMA9uosyIpveQRpqSG0CgYEAxsAS
+wCQKrhuPq2YtGtFR7K4BL+N+0E1Vq6h49u1ukcgUe0GHVD3VzBypNCv7rWEVHzAg
+biCVi7PCjzZYW4fYZmzVD4JbFLVGOUu7aJwLaE4wDe72DNr6YZhcS+Ta98BP+x0q
+Wt34JNPDabRPfhXfhiCqnWjjod+4Zqx4VJVNgG0CgYB5EXL8xJhyAbW5Hk/x56Mm
++BGKjoR7HS3/rMiU6hJv5SMObrbGPI3YcqZm/gn8BO6jaEGg30E6tWMbiyc270j2
+be/vZe/NQcAuevOHuX3IGvJb7nzaLO46UBgtrmnv0mCkzuFIfh1ZNKdI+i9Ie6wZ
+m4bVjNod0EGVqlQgELDXGQKBgB+NNmzSS++/6FrpaZesSzkrlnynvOYMoOETacCp
+iLgT70xx5q308w/oLORfZyDrHJNK7JsPCS6YZvadRgGh2zTHajuAEj2DWZaW8zV0
+MEtqvi44FU+NI9qCeYSC3FAgc5IF20d5nX8bLxaEzWnSxx1f6jX7BMgZ4AhMsP2c
+hiUxAoGAFaxn+t9blIjqUiuh0smSYFhLBVPZveYHQDmQYERjktptBd3X95fGnSKh
+iDe2iPGyud2+Yu4X/VjHLh/MRru+ZXvPXw1XwEqX93q8a1n283ul0Rl9+KKKOVHR
+eecTjI/BfXBf33mPRKny3xuHw6uwta2T3OXky9IhqYS1kkHiZWA=
+-----END RSA PRIVATE KEY-----
+" != "" ]; then
+cat << 'EOF' > /root/.ssh/id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAqdHr4zmivHPEimCuK9vtATe4PvGEr0Np/JxYDlEQsr5Cajh4
+tajxmZrjdAnJWFXVbmYl21sN1cUW0ltxB+9+lc4GNVNCZqE4kmpsyx2lrF7xCFvF
+Qou26JYud/UCT9IpCYgWjQIGSC8gq1TzfgOpn6rWnLNSl3WdM5TKtQT7RXIkdSUw
+kXFbObz9lsM+ULWNozCId2osJHj4zE0D3H5odU5DpcWLuSG0MmdxtWoQNJjSiPWt
+HbRdvNmr/xeqcAfzdUdZxGf/VbXDdiNZn9TVv7UxxBHE812KNUf/Cvb5agDfEL7x
+i2bWXbhr4jVTaDVr6MWl8Q7fAj79gdjQnUBWaQIDAQABAoIBAFU3kU6yIna9BViH
+UX+S2ijtRBjZ68JjavEnp4xvo5h+nydcdT57q9lv/0nAi3g3gmXm/oJH+/ZU87HV
+zy+zP+t+umDSChUkPBZFL5jxpKyN7BhMrP1KzRuEGYd6vJE/nfY5g095P5vDgnpX
+o+SNg/YqrY1u8zgr/hnfRaV2/XyIDEEcQXTHseWTnnMQnULFU88xL8yq8ACT5GhK
+7A9m5ukfcU6d/fs/psz5Yqw5IQsWbv1yJ3/FKufPHlo2Nzh3/3eDAZUXvaBgf1so
+FWFpHtkry3OXOGaZ98HgF9hL0twS0pzMvuypdGUQAt6nyB1N5re4LK/MAOddqwEc
+1+NQzfECgYEA2ryEf0GLJdtiYs3F4HbwTwJVIXdyWv7kjYGeMkutzzAjXl6wx8aq
+kfqLJ7x7UkR5unZ1ajEbKBciAlSuFA+Gikn6a4Lv8h87aSnHpPd/2VSitRlI/gW7
+w4U4CL3Br1JyonU5WA7VYfTow7KnHBhdwm27RMA9uosyIpveQRpqSG0CgYEAxsAS
+wCQKrhuPq2YtGtFR7K4BL+N+0E1Vq6h49u1ukcgUe0GHVD3VzBypNCv7rWEVHzAg
+biCVi7PCjzZYW4fYZmzVD4JbFLVGOUu7aJwLaE4wDe72DNr6YZhcS+Ta98BP+x0q
+Wt34JNPDabRPfhXfhiCqnWjjod+4Zqx4VJVNgG0CgYB5EXL8xJhyAbW5Hk/x56Mm
++BGKjoR7HS3/rMiU6hJv5SMObrbGPI3YcqZm/gn8BO6jaEGg30E6tWMbiyc270j2
+be/vZe/NQcAuevOHuX3IGvJb7nzaLO46UBgtrmnv0mCkzuFIfh1ZNKdI+i9Ie6wZ
+m4bVjNod0EGVqlQgELDXGQKBgB+NNmzSS++/6FrpaZesSzkrlnynvOYMoOETacCp
+iLgT70xx5q308w/oLORfZyDrHJNK7JsPCS6YZvadRgGh2zTHajuAEj2DWZaW8zV0
+MEtqvi44FU+NI9qCeYSC3FAgc5IF20d5nX8bLxaEzWnSxx1f6jX7BMgZ4AhMsP2c
+hiUxAoGAFaxn+t9blIjqUiuh0smSYFhLBVPZveYHQDmQYERjktptBd3X95fGnSKh
+iDe2iPGyud2+Yu4X/VjHLh/MRru+ZXvPXw1XwEqX93q8a1n283ul0Rl9+KKKOVHR
+eecTjI/BfXBf33mPRKny3xuHw6uwta2T3OXky9IhqYS1kkHiZWA=
+-----END RSA PRIVATE KEY-----
+
+EOF
+chmod 400 /root/.ssh/id_rsa
+fi
+
+mkdir -p /srv/salt/scripts
+curl -q ${BOOTSTRAP_SCRIPT_URL} -o /srv/salt/scripts/bootstrap.sh
+chmod u+x /srv/salt/scripts/bootstrap.sh
+source /srv/salt/scripts/bootstrap.sh
+
+system_config_master
+
+clone_reclass || exit 1
+
+source_local_envs
+
+# reclass overrides
+mkdir -p ${RECLASS_ROOT}/classes/cluster
+cat << EOF > ${RECLASS_ROOT}/classes/cluster/overrides.yml
+parameters:
+  _param:
+    infra_config_address: $node_control_ip
+    infra_config_deploy_address: $node_ip
+EOF
+
+#bootstrap
+cd /srv/salt/scripts
+(set -o pipefail && MASTER_HOSTNAME=cfg01.lab02.bud-mk.local ./bootstrap.sh 2>&1 | tee /var/log/bootstrap-salt-result.log) ||\
+  wait_condition_send "FAILURE" "Command \"MASTER_HOSTNAME=cfg01.lab02.bud-mk.local /srv/salt/scripts/bootstrap.sh\" failed. Output: '$(cat /var/log/bootstrap-salt-result.log)'"
+
+# states
+echo "Running salt master states ..."
+run_states=("linux,openssh" "reclass" "salt.master.service" "salt")
+for state in "${run_states[@]}"
+do
+  salt-call --no-color state.apply "$state" -l info || wait_condition_send "FAILURE" "Salt state $state run failed."
+done
+
+salt-call saltutil.sync_all
+
+else
+  # AWS
+  eval "# Required variables:
+# nodes_os - operating system (centos7, trusty, xenial)
+# node_hostname - hostname of this node (mynode)
+# node_domain - domainname of this node (mydomain)
+# cluster_name - clustername, used to classify this node (virtual_mcp11_k8s)
+# config_host - IP/hostname of salt-master (192.168.0.1)
+#
+# private_key - SSH private key, used to clone reclass model
+# reclass_address - address of reclass model (https://github.com/user/repo.git)
+# reclass_branch - branch of reclass model (master)
+
+
+export BOOTSTRAP_SCRIPT_URL=$bootstrap_script_url
+export BOOTSTRAP_SCRIPT_URL=${BOOTSTRAP_SCRIPT_URL:-https://raw.githubusercontent.com/salt-formulas/salt-formulas-scripts/master/bootstrap.sh}
+
+# inherit heat variables
+export RECLASS_ADDRESS=https://gerrit.mcp.mirantis.net/salt-models/mcp-virtual-lab
+export RECLASS_BRANCH=master
+export RECLASS_ROOT=$reclass_root
+export CLUSTER_NAME=os-ha-ovs
+export HOSTNAME=cfg01
+export DOMAIN=lab02.bud-mk.local
+export DISTRIB_REVISION=nightly
+export EXTRA_FORMULAS=""
+# set with default's if not provided at all
+export RECLASS_BRANCH=${RECLASS_BRANCH:-master}
+export RECLASS_ROOT=${RECLASS_ROOT:-/srv/salt/reclass}
+export DISTRIB_REVISION=${DISTRIB_REVISION:-nightly}
+#export DEBUG=${DEBUG:-1}
+
+# get Master IP addresses
+node_ip="$(ip a | awk -v prefix="^    inet 192.168.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_control_ip="$(ip a | awk -v prefix="^    inet 172.16.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+export MASTER_IP=$node_ip
+
+# setup private key
+[ ! -d /root/.ssh ] && mkdir -p /root/.ssh
+if [ "-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAqdHr4zmivHPEimCuK9vtATe4PvGEr0Np/JxYDlEQsr5Cajh4
+tajxmZrjdAnJWFXVbmYl21sN1cUW0ltxB+9+lc4GNVNCZqE4kmpsyx2lrF7xCFvF
+Qou26JYud/UCT9IpCYgWjQIGSC8gq1TzfgOpn6rWnLNSl3WdM5TKtQT7RXIkdSUw
+kXFbObz9lsM+ULWNozCId2osJHj4zE0D3H5odU5DpcWLuSG0MmdxtWoQNJjSiPWt
+HbRdvNmr/xeqcAfzdUdZxGf/VbXDdiNZn9TVv7UxxBHE812KNUf/Cvb5agDfEL7x
+i2bWXbhr4jVTaDVr6MWl8Q7fAj79gdjQnUBWaQIDAQABAoIBAFU3kU6yIna9BViH
+UX+S2ijtRBjZ68JjavEnp4xvo5h+nydcdT57q9lv/0nAi3g3gmXm/oJH+/ZU87HV
+zy+zP+t+umDSChUkPBZFL5jxpKyN7BhMrP1KzRuEGYd6vJE/nfY5g095P5vDgnpX
+o+SNg/YqrY1u8zgr/hnfRaV2/XyIDEEcQXTHseWTnnMQnULFU88xL8yq8ACT5GhK
+7A9m5ukfcU6d/fs/psz5Yqw5IQsWbv1yJ3/FKufPHlo2Nzh3/3eDAZUXvaBgf1so
+FWFpHtkry3OXOGaZ98HgF9hL0twS0pzMvuypdGUQAt6nyB1N5re4LK/MAOddqwEc
+1+NQzfECgYEA2ryEf0GLJdtiYs3F4HbwTwJVIXdyWv7kjYGeMkutzzAjXl6wx8aq
+kfqLJ7x7UkR5unZ1ajEbKBciAlSuFA+Gikn6a4Lv8h87aSnHpPd/2VSitRlI/gW7
+w4U4CL3Br1JyonU5WA7VYfTow7KnHBhdwm27RMA9uosyIpveQRpqSG0CgYEAxsAS
+wCQKrhuPq2YtGtFR7K4BL+N+0E1Vq6h49u1ukcgUe0GHVD3VzBypNCv7rWEVHzAg
+biCVi7PCjzZYW4fYZmzVD4JbFLVGOUu7aJwLaE4wDe72DNr6YZhcS+Ta98BP+x0q
+Wt34JNPDabRPfhXfhiCqnWjjod+4Zqx4VJVNgG0CgYB5EXL8xJhyAbW5Hk/x56Mm
++BGKjoR7HS3/rMiU6hJv5SMObrbGPI3YcqZm/gn8BO6jaEGg30E6tWMbiyc270j2
+be/vZe/NQcAuevOHuX3IGvJb7nzaLO46UBgtrmnv0mCkzuFIfh1ZNKdI+i9Ie6wZ
+m4bVjNod0EGVqlQgELDXGQKBgB+NNmzSS++/6FrpaZesSzkrlnynvOYMoOETacCp
+iLgT70xx5q308w/oLORfZyDrHJNK7JsPCS6YZvadRgGh2zTHajuAEj2DWZaW8zV0
+MEtqvi44FU+NI9qCeYSC3FAgc5IF20d5nX8bLxaEzWnSxx1f6jX7BMgZ4AhMsP2c
+hiUxAoGAFaxn+t9blIjqUiuh0smSYFhLBVPZveYHQDmQYERjktptBd3X95fGnSKh
+iDe2iPGyud2+Yu4X/VjHLh/MRru+ZXvPXw1XwEqX93q8a1n283ul0Rl9+KKKOVHR
+eecTjI/BfXBf33mPRKny3xuHw6uwta2T3OXky9IhqYS1kkHiZWA=
+-----END RSA PRIVATE KEY-----
+" != "" ]; then
+cat << 'EOF' > /root/.ssh/id_rsa
+-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAqdHr4zmivHPEimCuK9vtATe4PvGEr0Np/JxYDlEQsr5Cajh4
+tajxmZrjdAnJWFXVbmYl21sN1cUW0ltxB+9+lc4GNVNCZqE4kmpsyx2lrF7xCFvF
+Qou26JYud/UCT9IpCYgWjQIGSC8gq1TzfgOpn6rWnLNSl3WdM5TKtQT7RXIkdSUw
+kXFbObz9lsM+ULWNozCId2osJHj4zE0D3H5odU5DpcWLuSG0MmdxtWoQNJjSiPWt
+HbRdvNmr/xeqcAfzdUdZxGf/VbXDdiNZn9TVv7UxxBHE812KNUf/Cvb5agDfEL7x
+i2bWXbhr4jVTaDVr6MWl8Q7fAj79gdjQnUBWaQIDAQABAoIBAFU3kU6yIna9BViH
+UX+S2ijtRBjZ68JjavEnp4xvo5h+nydcdT57q9lv/0nAi3g3gmXm/oJH+/ZU87HV
+zy+zP+t+umDSChUkPBZFL5jxpKyN7BhMrP1KzRuEGYd6vJE/nfY5g095P5vDgnpX
+o+SNg/YqrY1u8zgr/hnfRaV2/XyIDEEcQXTHseWTnnMQnULFU88xL8yq8ACT5GhK
+7A9m5ukfcU6d/fs/psz5Yqw5IQsWbv1yJ3/FKufPHlo2Nzh3/3eDAZUXvaBgf1so
+FWFpHtkry3OXOGaZ98HgF9hL0twS0pzMvuypdGUQAt6nyB1N5re4LK/MAOddqwEc
+1+NQzfECgYEA2ryEf0GLJdtiYs3F4HbwTwJVIXdyWv7kjYGeMkutzzAjXl6wx8aq
+kfqLJ7x7UkR5unZ1ajEbKBciAlSuFA+Gikn6a4Lv8h87aSnHpPd/2VSitRlI/gW7
+w4U4CL3Br1JyonU5WA7VYfTow7KnHBhdwm27RMA9uosyIpveQRpqSG0CgYEAxsAS
+wCQKrhuPq2YtGtFR7K4BL+N+0E1Vq6h49u1ukcgUe0GHVD3VzBypNCv7rWEVHzAg
+biCVi7PCjzZYW4fYZmzVD4JbFLVGOUu7aJwLaE4wDe72DNr6YZhcS+Ta98BP+x0q
+Wt34JNPDabRPfhXfhiCqnWjjod+4Zqx4VJVNgG0CgYB5EXL8xJhyAbW5Hk/x56Mm
++BGKjoR7HS3/rMiU6hJv5SMObrbGPI3YcqZm/gn8BO6jaEGg30E6tWMbiyc270j2
+be/vZe/NQcAuevOHuX3IGvJb7nzaLO46UBgtrmnv0mCkzuFIfh1ZNKdI+i9Ie6wZ
+m4bVjNod0EGVqlQgELDXGQKBgB+NNmzSS++/6FrpaZesSzkrlnynvOYMoOETacCp
+iLgT70xx5q308w/oLORfZyDrHJNK7JsPCS6YZvadRgGh2zTHajuAEj2DWZaW8zV0
+MEtqvi44FU+NI9qCeYSC3FAgc5IF20d5nX8bLxaEzWnSxx1f6jX7BMgZ4AhMsP2c
+hiUxAoGAFaxn+t9blIjqUiuh0smSYFhLBVPZveYHQDmQYERjktptBd3X95fGnSKh
+iDe2iPGyud2+Yu4X/VjHLh/MRru+ZXvPXw1XwEqX93q8a1n283ul0Rl9+KKKOVHR
+eecTjI/BfXBf33mPRKny3xuHw6uwta2T3OXky9IhqYS1kkHiZWA=
+-----END RSA PRIVATE KEY-----
+
+EOF
+chmod 400 /root/.ssh/id_rsa
+fi
+
+mkdir -p /srv/salt/scripts
+curl -q ${BOOTSTRAP_SCRIPT_URL} -o /srv/salt/scripts/bootstrap.sh
+chmod u+x /srv/salt/scripts/bootstrap.sh
+source /srv/salt/scripts/bootstrap.sh
+
+system_config_master
+
+clone_reclass || exit 1
+
+source_local_envs
+
+# reclass overrides
+mkdir -p ${RECLASS_ROOT}/classes/cluster
+cat << EOF > ${RECLASS_ROOT}/classes/cluster/overrides.yml
+parameters:
+  _param:
+    infra_config_address: $node_control_ip
+    infra_config_deploy_address: $node_ip
+EOF
+
+#bootstrap
+cd /srv/salt/scripts
+(set -o pipefail && MASTER_HOSTNAME=cfg01.lab02.bud-mk.local ./bootstrap.sh 2>&1 | tee /var/log/bootstrap-salt-result.log) ||\
+  wait_condition_send "FAILURE" "Command \"MASTER_HOSTNAME=cfg01.lab02.bud-mk.local /srv/salt/scripts/bootstrap.sh\" failed. Output: '$(cat /var/log/bootstrap-salt-result.log)'"
+
+# states
+echo "Running salt master states ..."
+run_states=("linux,openssh" "reclass" "salt.master.service" "salt")
+for state in "${run_states[@]}"
+do
+  salt-call --no-color state.apply "$state" -l info || wait_condition_send "FAILURE" "Salt state $state run failed."
+done
+
+salt-call saltutil.sync_all
+"
+fi
+
+sleep 1
+
+echo "Classifying node ..."
+os_codename=$(salt-call grains.item oscodename --out key | awk '/oscodename/ {print $2}')
+node_network01_ip="$(ip a | awk -v prefix="^    inet 192.168.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_network02_ip="$(ip a | awk -v prefix="^    inet 172.16.10[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_network03_ip="$(ip a | awk -v prefix="^    inet 10.1.0[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_network04_ip="$(ip a | awk -v prefix="^    inet 10.16.0[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+node_network05_ip="$(ip a | awk -v prefix="^    inet 192.168.90[.]" '$0 ~ prefix {split($2, a, "/"); print a[1]}'| head -1)"
+
+node_network01_iface="$(ip a | awk -v prefix="^    inet 192.168.10[.]" '$0 ~ prefix {split($7, a, "/"); print a[1]}'| head -1)"
+node_network02_iface="$(ip a | awk -v prefix="^    inet 172.16.10[.]" '$0 ~ prefix {split($7, a, "/"); print a[1]}'| head -1)"
+node_network03_iface="$(ip a | awk -v prefix="^    inet 10.1.0[.]" '$0 ~ prefix {split($7, a, "/"); print a[1]}'| head -1)"
+node_network04_iface="$(ip a | awk -v prefix="^    inet 10.16.0[.]" '$0 ~ prefix {split($7, a, "/"); print a[1]}'| head -1)"
+node_network05_iface="$(ip a | awk -v prefix="^    inet 192.168.90[.]" '$0 ~ prefix {split($7, a, "/"); print a[1]}'| head -1)"
+
+if [ "$node_network05_iface" != "" ]; then
+  node_network05_hwaddress="$(cat /sys/class/net/$node_network05_iface/address)"
+fi
+
+
+# find more parameters (every env starting param_)
+more_params=$(env | grep "^param_" | sed -e 's/=/":"/g' -e 's/^/"/g' -e 's/$/",/g' | tr "\n" " " | sed 's/, $//g')
+if [ "$more_params" != "" ]; then
+  echo "Additional params: $more_params"
+  more_params=", $more_params"
+fi
+
+
+declare -A vars
+vars=(
+    ["node_master_ip"]=127.0.0.1
+    ["node_os"]=${os_codename}
+    ["node_deploy_ip"]=${node_network01_ip}
+    ["node_deploy_iface"]=${node_network01_iface}
+    ["node_control_ip"]=${node_network02_ip}
+    ["node_control_iface"]=${node_network02_iface}
+    ["node_tenant_ip"]=${node_network03_ip}
+    ["node_tenant_iface"]=${node_network03_iface}
+    ["node_external_ip"]=${node_network04_ip}
+    ["node_external_iface"]=${node_network04_iface}
+    ["node_baremetal_ip"]=${node_network05_ip}
+    ["node_baremetal_iface"]=${node_network05_iface}
+    ["node_baremetal_hwaddress"]=${node_network05_hwaddress}
+    ["node_domain"]=lab02.bud-mk.local
+    ["node_cluster"]=os-ha-ovs
+    ["node_hostname"]=cfg01
+)
+data=""; i=0
+for key in "${!vars[@]}"; do
+    data+="\"${key}\": \"${vars[${key}]}\""
+    i=$(($i+1))
+    if [ $i -lt ${#vars[@]} ]; then
+        data+=", "
+    fi
+done
+salt-call event.send "reclass/minion/classify" "{$data ${more_params}}"
+
+sleep 5
+
+salt-call saltutil.sync_all
+salt-call mine.flush
+salt-call mine.update
+
+wait_condition_send "SUCCESS" "Instance successfuly started."
