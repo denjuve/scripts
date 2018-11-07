@@ -1,4 +1,4 @@
-!#/bin/bash
+#!/bin/bash
 sudo apt-get remove docker docker-engine docker.io -y
 
 sudo apt-get update
