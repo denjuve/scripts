@@ -1,9 +1,10 @@
 #!/bin/bash
-base_image="https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
+base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
+#"https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
-node=vm4
-ram=5000
+node=stage01
+ram=1500
 cpu=2
 IP_ADDR='172.16.0.10'
 
@@ -31,7 +32,8 @@ function prepare_vms {
   local image_dir=$1; shift
 #?  local repos_pkgs_str=$1; shift # ^-sep list of repos, pkgs to install/rm
 #  local vnodes=("$@")
-  local image="xenial-server-cloudimg-amd64-disk1.img"
+  local image="CentOS-7-x86_64-GenericCloud.qcow2"
+#"xenial-server-cloudimg-amd64-disk1.img"
 #  base_image_opnfv_fuel.img
   local vcp_image=${image%.*}_vcp.img
   local _o=${base_image/*\/}
