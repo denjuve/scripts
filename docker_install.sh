@@ -17,5 +17,5 @@ sudo add-apt-repository \
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
 sudo apt-get update
-apt install -y docker-ce=18.06.1~ce~3-0~ubuntu
+sudo apt install -y docker-ce=18.06.1~ce~3-0~ubuntu
 #sudo apt-get install docker-ce -y
