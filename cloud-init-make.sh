@@ -1,13 +1,34 @@
 #!/bin/bash
-base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
-#"https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
+vm_os=ubuntu
+centos
+ubuntu #ubuntu or centos
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
-node=stage01
-ram=1500
+node=test2
+ram=15000
 cpu=2
-IP_ADDR='172.16.0.10'
+IP_ADDR='192.168.122.103'
+net_name='default'
+net_bridge=virbr0
 
+function update_public_network {
+     # set static ip address for node    \/ change this
+cmac=$(virsh domiflist ${node} | awk '/virbr0/ {print $5; exit}')
+echo $cmac; echo $IP_ADDR
+virsh net-update "${net_name}" add ip-dhcp-host \
+    "<host mac='${cmac}' ip='${IP_ADDR}'/>" --live --config
+}
+#    "<host mac='${cmac}' name='${node}' ip='${IP_ADDR}'/>" --live --config
+
+
+if [ "$vm_os" = "ubuntu" ]
+then
+base_image="https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
+image1="xenial-server-cloudimg-amd64-disk1.img"
+else
+base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
+image1="CentOS-7-x86_64-GenericCloud.qcow2"
+fi
 
 #function generate_ssh_key {
 #  local mcp_ssh_key=$(basename "${SSH_KEY}")
@@ -32,7 +53,8 @@ function prepare_vms {
   local image_dir=$1; shift
 #?  local repos_pkgs_str=$1; shift # ^-sep list of repos, pkgs to install/rm
 #  local vnodes=("$@")
-  local image="CentOS-7-x86_64-GenericCloud.qcow2"
+  local image="$image1"
+#"CentOS-7-x86_64-GenericCloud.qcow2"
 #"xenial-server-cloudimg-amd64-disk1.img"
 #  base_image_opnfv_fuel.img
   local vcp_image=${image%.*}_vcp.img
@@ -78,7 +100,7 @@ wget --progress=dot:giga -P "${image_dir}" -N "${base_image}"
 #    else
 #      user_data='user-data.admin.sh'
 #    fi
-    ./create-config-drive.sh -k /home/dkucherenko/.ssh/id_rsa.pub \
+    ./create-config-drive.sh -k ~/.ssh/id_rsa.pub \
        -u "${user_data}" -h "${node}" "${image_dir}/${node}.iso"
     cp "${image_dir}/${image}" "${image_dir}/${node}.qcow2"
     qemu-img resize "${image_dir}/${node}.qcow2" 100G
@@ -142,7 +164,8 @@ function create_vms {
 #      net_args="${net_args} --network bridge=${net},model=virtio"
 #    done
 
-net_args="--network bridge=virbr0,model=virtio" # --network bridge=ub16,model=virtio"
+net_args="--network bridge=${net_bridge},model=virtio"
+# --network bridge=ub16,model=virtio"
 #--network bridge=ub16,model=virtio"
 #--network bridge=virbr0,model=virtio --network bridge=virbr0,model=virtio --network bridge=mngbr0,model=virtio"
 
@@ -167,13 +190,6 @@ net_args="--network bridge=virbr0,model=virtio" # --network bridge=ub16,model=vi
 
     create_vms "${STORAGE_DIR}" "${virtual_nodes_data}" "${OPNFV_BRIDGES[@]}"
 
-function update_public_network {
-  # set static ip address for salt master node, MaaS node
-  local cmac=$(virsh domiflist vm1 | awk '/ub16/ {print $5; exit}')
-  virsh net-update "public" add ip-dhcp-host \
-    "<host mac='${cmac}' name='${node}' ip='${IP_ADDR}'/>" --live --config
-}
-
-#    update_public_network
+    update_public_network
 
     virsh start "${node}"
