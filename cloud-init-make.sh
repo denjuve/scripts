@@ -4,10 +4,10 @@ centos
 ubuntu #ubuntu or centos
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
-node=test2
+node=s01
 ram=15000
 cpu=2
-IP_ADDR='192.168.122.103'
+IP_ADDR='192.168.122.100'
 net_name='default'
 net_bridge=virbr0
 
@@ -21,7 +21,7 @@ virsh net-update "${net_name}" add ip-dhcp-host \
 #    "<host mac='${cmac}' name='${node}' ip='${IP_ADDR}'/>" --live --config
 
 
-if [ "$vm_os" = "ubuntu" ]
+if [[ "$vm_os" == "ubuntu" ]]
 then
 base_image="https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
 image1="xenial-server-cloudimg-amd64-disk1.img"
