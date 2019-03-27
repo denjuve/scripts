@@ -1,0 +1,181 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.3/types.yaml
+  - plugin:cloudify-openstack-plugin
+  - plugin:cloudify-utilities-plugin
+
+inputs:
+
+  username:
+    description: OS_USERNAME as specified in Openstack RC file.
+    default: 5gt
+
+  password:
+    description: Openstack user password.
+    default: secret
+
+  project_id:
+    default: 57d51be8ba314053b336590c63e88e0b
+
+  tenant_name:
+    description: OS_TENANT_NAME as specified in Openstack RC file.
+    default: 5gt
+
+  auth_url:
+    description: OS_AUTH_URL as specified in Openstack RC file.
+    default: http://10.5.1.95:5000/v3
+
+  user_domain_name:
+    default: Default
+
+  region:
+    description: OS_REGION_NAME as specified in Openstack RC file.
+    default: "RegionOne"
+
+  ssh_key:
+    description: >
+      the SSH keys to be installed on the servers
+    default: cloudify-key
+
+  image_client_alice_2:
+    default: client-alice_2
+
+  flavor_name:
+    description: >
+      An Openstack Flavor ID.
+    default: 'm1.small2'
+
+  nameservers:
+    default: [8.8.4.4, 8.8.8.8]
+
+  public_network_name:
+    default: provider1
+
+  heat_net_mgmt:
+    default: HEAT_NET_MNGT
+  heat_net_an_lte:
+    default: HEAT_AN_LTE
+  heat_net_mgmt_subnet:
+    default: HEAT_NET_MGMT_SUBNET
+  heat_net_an_lte_subnet:
+    default: HEAT_NET_AN_LTE_SUBNET
+
+dsl_definitions:
+
+ openstack_config: &openstack_config
+    username: { get_input: username }
+    password: { get_input: password }
+    project_id: { get_input: project_id }
+    auth_url: { get_input: auth_url }
+    region: { get_input: region }
+    user_domain_name: { get_input: user_domain_name }
+
+node_templates:
+
+  my-openstack-keypair:
+    type: cloudify.openstack.nodes.KeyPair
+    properties:
+      use_external_resource: true
+      resource_id: { get_input: ssh_key }
+      private_key_path: '/etc/cloudify/key'
+      openstack_config: *openstack_config
+
+#  server_security_group:
+#    type: cloudify.openstack.nodes.SecurityGroup
+#    properties:
+#      security_group:
+#        name: redirector-security-group
+#      rules:
+#        - remote_ip_prefix: 0.0.0.0/0
+#          protocol: tcp
+#        - remote_ip_prefix: 0.0.0.0/0
+#          protocol: udp
+#        - remote_ip_prefix: 0.0.0.0/0
+#          protocol: icmp
+#          port_range_min: null
+#          port_range_max: null
+#      openstack_config: *openstack_config
+
+
+  heat_net_mgmt:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt }
+
+  heat_net_an_lte:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_an_lte }
+
+  heat_net_mgmt_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt_subnet }
+
+  heat_net_an_lte_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_an_lte_subnet }
+
+  heat_client_alice_2_net_mgmt_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.254.100
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_mgmt
+      - type: cloudify.relationships.depends_on
+        target: heat_net_mgmt_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:95:91:09
+
+  heat_client_alice_2_net_an_lte_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.3.100
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_an_lte
+      - type: cloudify.relationships.depends_on
+        target: heat_net_an_lte_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:95:91:09
+
+  heat_client_alice_2:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      resource_id: 'INST_ROAMING_OP2_ALICE'
+      openstack_config: *openstack_config
+      image: { get_input: image_client_alice_2 }
+#image_client_bob }
+      flavor: { get_input: flavor_name }
+    relationships:
+      - target: my-openstack-keypair
+        type: cloudify.openstack.server_connected_to_keypair
+      - target: heat_client_alice_2_net_mgmt_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: heat_client_alice_2_net_an_lte_port
+        type: cloudify.openstack.server_connected_to_port
