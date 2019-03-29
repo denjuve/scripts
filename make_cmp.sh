@@ -6,9 +6,9 @@ ctl01_ip="10.5.1.95"
 cmp01_ip="10.5.1.97"
 cmp02_ip="10.5.1.96"
 cmp03_ip="10.5.1.98"
-cmp04_ip=""
-cmp05_ip=""
-cmp06_ip=""
+cmp04_ip="10.5.1.99"
+cmp05_ip="10.5.1.93"
+cmp06_ip="10.5.1.92"
 
 ctl01_name="ctl01"
 cmp01_name="cmp01"
@@ -29,7 +29,9 @@ echo "$cmp06_ip       $cmp06_name" >> /etc/hosts
 
 yum update -y
 yum upgrade -y
-yum install -y vim telnet mtr net-tools tcpdump git wget curl
+yum install -y vim telnet mtr net-tools tcpdump git wget curl bridge-utils
+brctl addbr br-ex
+brctl addbr br-tun
 
 
 #cat /etc/chrony.conf | grep -v "#" | grep -v -e '^$'
@@ -117,7 +119,9 @@ EOF
 systemctl enable libvirtd.service openstack-nova-compute.service
 systemctl restart libvirtd.service openstack-nova-compute.service
 
-cat << EOF > /etc/neutron/neutron.conf
+yum install openstack-neutron-linuxbridge ebtables ipset -y
+
+cat<<EOF > /etc/neutron/neutron.conf
 [DEFAULT]
 transport_url = rabbit://openstack:d3aae2d875a891cc95b4@ctl01
 auth_strategy = keystone
@@ -137,7 +141,7 @@ lock_path = /var/lib/neutron/tmp
 EOF
 
 
-cat << EOF > /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+cat<<EOF > /etc/neutron/plugins/ml2/linuxbridge_agent.ini
 [DEFAULT]
 [agent]
 [linux_bridge]
@@ -151,6 +155,7 @@ enable_security_group = True
 enable_vxlan = true
 local_ip = $current_tenant_ip
 l2_population = true
+EOF
 
 
 modprobe br_netfilter
@@ -166,10 +171,3 @@ ip link add dev br-ex-port type veth peer name qbr-port
 ip li set dev br-ex-port up
 ip li set dev qbr-port up
 brctl addif br-ex br-ex-port
-
-
-
-
-
-
-
