@@ -160,7 +160,7 @@ node_templates:
           inputs:
             args:
               port_security_enabled: false
-              mac_address: 52:54:00:95:91:09
+              mac_address: 52:54:00:67:9e:5c
 
   heat_client_alice_2:
     type: cloudify.openstack.nodes.Server
