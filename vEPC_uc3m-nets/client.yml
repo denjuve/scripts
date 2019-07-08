@@ -53,13 +53,15 @@ inputs:
     default: provider1
 
   heat_net_mgmt:
-    default: HEAT_NET_MNGT
+    default: HEAT_NET_MNGT_2
   heat_net_an_lte:
     default: HEAT_AN_LTE
+#HEAT_AN_LTE_2
   heat_net_mgmt_subnet:
-    default: HEAT_NET_MGMT_SUBNET
+    default: HEAT_NET_MGMT_SUBNET_2
   heat_net_an_lte_subnet:
     default: HEAT_NET_AN_LTE_SUBNET
+#HEAT_NET_AN_LTE_SUBNET_2
 
 dsl_definitions:
 
@@ -130,7 +132,7 @@ node_templates:
     type: cloudify.openstack.nodes.Port
     properties:
       openstack_config: *openstack_config
-      fixed_ip: 192.168.254.100
+      fixed_ip: 192.168.253.100
     relationships:
       - type: cloudify.relationships.contained_in
         target: heat_net_mgmt

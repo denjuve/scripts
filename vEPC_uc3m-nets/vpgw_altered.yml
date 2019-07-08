@@ -50,10 +50,10 @@ inputs:
     default: [8.8.4.4, 8.8.8.8]
 
   public_network_name:
-    default: op_1
+    default: op_2
 
   public_subnet_name:
-    default: op_1-sub
+    default: op_2-sub
 
   heat_net_mgmt_subnet_cidr:
     default: 192.168.253.0/24
@@ -205,13 +205,13 @@ node_templates:
           inputs:
             args:
               port_security_enabled: false
-              mac_address: 52:54:00:04:b2:31
+              mac_address: 52:54:00:04:b2:32
 
   heat_vpgw_2_net_b_port:
     type: cloudify.openstack.nodes.Port
     properties:
       openstack_config: *openstack_config
-      fixed_ip: 10.2.36.15
+      fixed_ip: 10.34.36.15
     relationships:
       - type: cloudify.relationships.contained_in
         target: public_network

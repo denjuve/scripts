@@ -218,7 +218,7 @@ node_templates:
         ip_version: 4
         gateway_ip: 192.168.254.2
         cidr: { get_input: heat_net_mgmt_subnet_cidr }
-        enable_dhcp: False
+        #enable_dhcp: False
         dns_nameservers: { get_input: nameservers }
         allocation_pools: { get_input: heat_net_mgmt_subnet_allocation_pools }
       openstack_config: *openstack_config
@@ -235,7 +235,7 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: heat_net_an_lte_subnet_cidr }
-        enable_dhcp: False
+        #enable_dhcp: False
         dns_nameservers: { get_input: nameservers }
         allocation_pools: { get_input: heat_net_an_lte_subnet_allocation_pools }
       openstack_config: *openstack_config
@@ -251,7 +251,7 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: heat_net_a_subnet_cidr }
-        enable_dhcp: False
+        #enable_dhcp: False
         dns_nameservers: { get_input: nameservers }
         allocation_pools: { get_input: heat_net_a_subnet_allocation_pools }
       openstack_config: *openstack_config
@@ -267,7 +267,7 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: heat_net_d_subnet_cidr }
-        enable_dhcp: False
+        #enable_dhcp: False
         dns_nameservers: { get_input: nameservers }
         allocation_pools: { get_input: heat_net_d_subnet_allocation_pools }
       openstack_config: *openstack_config
@@ -283,7 +283,7 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: heat_net_gw_subnet_cidr }
-        enable_dhcp: False
+        #enable_dhcp: False
         dns_nameservers: { get_input: nameservers }
         allocation_pools: { get_input: heat_net_gw_subnet_allocation_pools }
       openstack_config: *openstack_config

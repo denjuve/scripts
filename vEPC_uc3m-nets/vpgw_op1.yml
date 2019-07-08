@@ -51,28 +51,33 @@ inputs:
 
   public_network_name:
     default: op_1
-#provider1
-
-#  public_network_name1:
-#    default: provider_o1
 
   public_subnet_name:
     default: op_1-sub
-#sub_provider_o1
 
   heat_net_mgmt_subnet_cidr:
-    default: 192.168.253.0/24
+    default: 192.168.254.0/24
   heat_net_mgmt_subnet_allocation_pools:
     default:
-      - start: 192.168.253.4
-        end: 192.168.253.254
+      - start: 192.168.254.4
+        end: 192.168.254.254
 
   heat_net_gw_subnet_cidr:
-    default: 192.168.38.0/24
+    default: 192.168.3.0/24
   heat_net_gw_subnet_allocation_pools:
     default:
-      - start: 192.168.38.4
-        end: 192.168.38.254
+      - start: 192.168.3.4
+        end: 192.168.3.254
+  heat_net_mgmt:
+    default: HEAT_NET_MNGT
+  heat_net_gw:
+    default: HEAT_NET_GW
+  heat_net_mgmt_subnet:
+    default: HEAT_NET_MGMT_SUBNET
+  heat_net_gw_subnet:
+    default: HEAT_NET_GW_SUBNET
+  heat_net_a_subnet_cidr:
+    default: 192.168.1.0/24
 
 dsl_definitions:
 
@@ -101,12 +106,6 @@ node_templates:
       use_external_resource: true
       resource_id: { get_input: public_network_name}
 
-#  public_network1:
-#    type: cloudify.openstack.nodes.Network
-#    properties:
-#      openstack_config: *openstack_config
-#      use_external_resource: true
-#      resource_id: { get_input: public_network_name1 }
   public_subnet:
     type: cloudify.openstack.nodes.Subnet
     properties:
@@ -114,62 +113,92 @@ node_templates:
       use_external_resource: true
       resource_id: { get_input: public_subnet_name }
 
+  heat_net_a:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: 'HEAT_NET_A'
+
+  heat_net_a_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+#      subnet:
+#        ip_version: 4
+#        cidr: { get_input: heat_net_a_subnet_cidr }
+#        dns_nameservers: { get_input: nameservers }
+#        allocation_pools: { get_input: heat_net_a_subnet_allocation_pools }
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: 'HEAT_NET_A_SUBNET'
+#    relationships:
+#      - type: cloudify.relationships.contained_in
+#        target:  heat_net_a
+
+
+
   heat_net_mgmt:
     type: cloudify.openstack.nodes.Network
     properties:
       openstack_config: *openstack_config
-      resource_id: HEAT_NET_MNGT_2
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt }
 
   heat_net_gw:
     type: cloudify.openstack.nodes.Network
     properties:
       openstack_config: *openstack_config
-      resource_id: HEAT_NET_GW_2
+      use_external_resource: true
+      resource_id: { get_input: heat_net_gw }
 
   heat_net_mgmt_subnet:
     type: cloudify.openstack.nodes.Subnet
     properties:
-      subnet:
-        ip_version: 4
-        gateway_ip: 192.168.253.2
-        cidr: { get_input: heat_net_mgmt_subnet_cidr }
-        #enable_dhcp: False
-        dns_nameservers: { get_input: nameservers }
-        allocation_pools: { get_input: heat_net_mgmt_subnet_allocation_pools }
+#      subnet:
+#        ip_version: 4
+#        gateway_ip: 192.168.254.2
+#        cidr: { get_input: heat_net_mgmt_subnet_cidr }
+#        enable_dhcp: False
+#        dns_nameservers: { get_input: nameservers }
+#        allocation_pools: { get_input: heat_net_mgmt_subnet_allocation_pools }
       openstack_config: *openstack_config
-      resource_id: HEAT_NET_MGMT_SUBNET_2
-    relationships:
-      - type: cloudify.relationships.contained_in
-        target: heat_net_mgmt
-      - type: cloudify.openstack.subnet_connected_to_router
-        target: heat_net_mgmt_router
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt_subnet }
+#      resource_id: HEAT_NET_MGMT_SUBNET_2
+#    relationships:
+#      - type: cloudify.relationships.contained_in
+#        target: heat_net_mgmt
+#      - type: cloudify.openstack.subnet_connected_to_router
+#        target: heat_net_mgmt_router
 
 
   heat_net_gw_subnet:
     type: cloudify.openstack.nodes.Subnet
     properties:
-      subnet:
-        ip_version: 4
-        cidr: { get_input: heat_net_gw_subnet_cidr }
-        #enable_dhcp: False
-        dns_nameservers: { get_input: nameservers }
-        allocation_pools: { get_input: heat_net_gw_subnet_allocation_pools }
+#      subnet:
+#        ip_version: 4
+#        cidr: { get_input: heat_net_gw_subnet_cidr }
+#        enable_dhcp: False
+#        dns_nameservers: { get_input: nameservers }
+#        allocation_pools: { get_input: heat_net_gw_subnet_allocation_pools }
       openstack_config: *openstack_config
-      resource_id: HEAT_NET_GW_SUBNET_2
-    relationships:
-      - type: cloudify.relationships.contained_in
-        target: heat_net_gw
-      - type: cloudify.openstack.subnet_connected_to_router
-        target: heat_net_gw_router
+      use_external_resource: true
+      resource_id: { get_input: heat_net_gw_subnet }
+#HEAT_NET_GW_SUBNET_2
+#    relationships:
+#      - type: cloudify.relationships.contained_in
+#        target: heat_net_gw
+#      - type: cloudify.openstack.subnet_connected_to_router
+#        target: heat_net_gw_router
 
-  heat_net_mgmt_router:
-    type: cloudify.openstack.nodes.Router
-    properties:
-      openstack_config: *openstack_config
-      resource_id: HEAT_NET_MGMT_ROUTER2
-    relationships:
-      - type: cloudify.relationships.connected_to
-        target: public_network
+#  heat_net_mgmt_router:
+#    type: cloudify.openstack.nodes.Router
+#    properties:
+#      openstack_config: *openstack_config
+#      resource_id: HEAT_NET_MGMT_ROUTER2
+#    relationships:
+#      - type: cloudify.relationships.connected_to
+#        target: public_network
 
   heat_net_gw_router:
     type: cloudify.openstack.nodes.Router
@@ -180,20 +209,19 @@ node_templates:
       - type: cloudify.relationships.connected_to
         target: public_network
 
-  floating_ip_vpgw_2_net_mgmt_port:
-    type: cloudify.openstack.nodes.FloatingIP
-    properties:
-      openstack_config: *openstack_config
-      floatingip:
-        floating_network_name: { get_input: public_network_name }
-        floating_ip_address: 10.2.35.15
-#10.5.1.172
+#  floating_ip_vpgw_2_net_mgmt_port:
+#    type: cloudify.openstack.nodes.FloatingIP
+#    properties:
+#      openstack_config: *openstack_config
+#      floatingip:
+#        floating_network_name: { get_input: public_network_name }
+#        floating_ip_address: 10.2.35.15
 
   heat_vpgw_2_net_mgmt_port:
     type: cloudify.openstack.nodes.Port
     properties:
       openstack_config: *openstack_config
-      fixed_ip: 192.168.253.15
+      fixed_ip: 192.168.254.15
     relationships:
       - type: cloudify.relationships.contained_in
         target: heat_net_mgmt
@@ -205,7 +233,7 @@ node_templates:
           inputs:
             args:
               port_security_enabled: false
-              mac_address: 52:54:00:04:b2:31
+              mac_address: 52:54:00:04:b2:32
 
   heat_vpgw_2_net_b_port:
     type: cloudify.openstack.nodes.Port
@@ -229,7 +257,7 @@ node_templates:
     type: cloudify.openstack.nodes.Port
     properties:
       openstack_config: *openstack_config
-      fixed_ip: 192.168.38.15
+      fixed_ip: 192.168.3.15
     relationships:
       - type: cloudify.relationships.contained_in
         target: heat_net_gw
@@ -241,7 +269,27 @@ node_templates:
           inputs:
             args:
               port_security_enabled: false
-              mac_address: 52:54:00:21:b9:c1
+              mac_address: 52:54:00:21:b9:00
+
+  heat_vpgw_2_net_a_port:    
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: 'heat_pgw_net_a_port'
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.1.15
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_a
+      - type: cloudify.relationships.depends_on
+        target: heat_net_a_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:00:11:ab
+
 
   heat_vpgw_2:
     type: cloudify.openstack.nodes.Server
@@ -260,4 +308,6 @@ node_templates:
       - target: heat_vpgw_2_net_b_port
         type: cloudify.openstack.server_connected_to_port
       - target: heat_vpgw_2_net_gw_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: heat_vpgw_2_net_a_port
         type: cloudify.openstack.server_connected_to_port
