@@ -1,0 +1,309 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.3/types.yaml
+  - plugin:cloudify-openstack-plugin
+  - plugin:cloudify-utilities-plugin
+
+inputs:
+
+  username:
+    description: OS_USERNAME as specified in Openstack RC file.
+    default: ehealth
+
+  password:
+    description: Openstack user password.
+    default: ehealth
+
+  project_id:
+    default: 380b5f21bbab48d6a72c81c6822937e0
+
+  tenant_name:
+    description: OS_TENANT_NAME as specified in Openstack RC file.
+    default: ehealth
+
+  auth_url:
+    description: OS_AUTH_URL as specified in Openstack RC file.
+    default: http://10.5.1.95:5000/v3
+
+  user_domain_name:
+    default: Default
+
+  region:
+    description: OS_REGION_NAME as specified in Openstack RC file.
+    default: "RegionOne"
+
+  ssh_key:
+    description: >
+      the SSH keys to be installed on the servers
+    default: cloudify-key
+
+  agent_key_public:
+    description: >
+      The content of the agent's public key.
+    default: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDG7DGkvIHqB+BmSH3CmFVy9QSPEtZJFVbNBnexUFNefRfi8LTmWTtorEclf8pkB4vIESjZr9Jl+AWj0wRtAhuEbZDKnwBEabBtwyzNskeG8YObmKi7K/ep6C8zqcNJkz7Kgks97Kjgr1aBjq6FC433xQSPiHiOc9QtmE5uunIMyZEXL2LtMSv/eFW2g6TYAqzOQXdwT56HIXlLldirapIOUnK0Hmvm1+IWA37oYxnDg6Jp7HlvDe8W8+6Jo4DWLp9++eRfcilrkmPg2g3noDTOMr6Pmcz/I6KWoXWfvIBdQcg0+FMgnjNqq8cn4OnbWtakdUVgvF8/Gdsj//IQSVLj
+#ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDyESKLSmHhXZwtRfSeIc9ZZ1ARP0kxEcDBqRO84jVGB+pw9UXqynrpeFVA7tib9GYSxIDmRj8xbU9BSUX/rvktx/vzBS8yKwYeATY3ncuPwf6tQIWsz0dKLJmQAzlsz4U7qsJvedAxxEuPBorwyfuILzHA355GOjnecfeKN3HPTscGbIBdQyRDnww8VAk0O+uaGx6DCbOYQFSpz7lNt4+eIBoAKdjYAdOTq4mCNdl0g/qH2OP/ria4x00c56DoP5A4xeekL6T6QTxsqEvHVi/TNSnjD9ch9wDqcSPyey7W60qL/No3r+dB4Mx0QwM2F92C77vhLqJfUFAx6g9eCieh
+
+  image_vpgw_2:
+    default: ub16-user/passw0rd_auth
+#xenial-server-cloudimg-amd64-disk1
+#vpgw_2
+
+  flavor_name:
+    description: >
+      An Openstack Flavor ID.
+    default: 'm1.small2'
+
+  nameservers:
+    default: [8.8.4.4, 8.8.8.8]
+
+  public_network_name:
+    default: op_2
+
+  public_subnet_name:
+    default: op_2-sub
+
+  heat_net_mgmt:
+    default: 10a3ac76-8ca7-4cdf-8618-a30485eef379
+#HEAT_NET_MNGT
+  heat_net_gw:
+    default: 15c209de-445e-4885-95a9-37db605d3db3
+#HEAT_NET_GW
+  heat_net_a:
+    default: 0ff52c40-0b3a-48f9-838d-9f15ccc18f62
+#'HEAT_NET_A'
+  heat_net_mgmt_subnet:
+    default: c4ef7127-a7db-4871-932b-f5601344b5f2
+#HEAT_NET_MGMT_SUBNET
+  heat_net_gw_subnet:
+    default: 9c684dfc-2235-495c-a006-d6e5ade347ac
+#HEAT_NET_GW_SUBNET
+  heat_net_a_subnet:
+    default: c356a002-229f-4eb8-84ea-c6a89d42ad0a
+#HEAT_NET_A_SUBNET
+  heat_net_gw_router:
+    default: 485ec86a-5802-408a-8f0d-a8498c50c82e
+#HEAT_NET_GW_ROUTER
+
+dsl_definitions:
+
+ openstack_config: &openstack_config
+    username: { get_input: username }
+    password: { get_input: password }
+    project_id: { get_input: project_id }
+    auth_url: { get_input: auth_url }
+    region: { get_input: region }
+    user_domain_name: { get_input: user_domain_name }
+
+node_templates:
+
+  my-openstack-keypair:
+    type: cloudify.openstack.nodes.KeyPair
+    properties:
+      use_external_resource: true
+      resource_id: { get_input: ssh_key }
+      private_key_path: '/etc/cloudify/key'
+      openstack_config: *openstack_config
+
+  public_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: public_network_name}
+
+  public_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: public_subnet_name }
+
+  heat_net_a:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_a }
+
+  heat_net_mgmt:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt }
+
+  heat_net_gw:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_gw }
+
+  heat_net_a_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id:  { get_input: heat_net_a_subnet }
+#'HEAT_NET_A_SUBNET'
+
+  heat_net_mgmt_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_mgmt_subnet }
+
+  heat_net_gw_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_gw_subnet }
+
+  heat_net_gw_router:
+    type: cloudify.openstack.nodes.Router
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_input: heat_net_gw_router }
+#    relationships:
+#      - type: cloudify.relationships.connected_to
+#        target: public_network
+
+  heat_vpgw_2_net_mgmt_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: 'heat_vpgw_net_mgmt_port'
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.254.15
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_mgmt
+      - type: cloudify.relationships.depends_on
+        target: heat_net_mgmt_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:04:b2:32
+
+  heat_vpgw_2_net_b_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: 'heat_vpgw_net_b_port'
+      openstack_config: *openstack_config
+      fixed_ip: 10.2.36.15
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: public_network
+      - type: cloudify.relationships.depends_on
+        target: public_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:2d:f0:80
+
+  heat_vpgw_2_net_gw_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: 'heat_vpgw_net_gw_port'
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.3.15
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_gw
+      - type: cloudify.relationships.depends_on
+        target: heat_net_gw_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:21:b9:00
+
+  heat_vpgw_2_net_a_port:    
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: 'heat_vpgw_net_a_port'
+      openstack_config: *openstack_config
+      fixed_ip: 192.168.1.15
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: heat_net_a
+      - type: cloudify.relationships.depends_on
+        target: heat_net_a_subnet
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              port_security_enabled: false
+              mac_address: 52:54:00:00:11:ab
+
+  heat_vpgw_2:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      resource_id: 'INST_VPGW_2'
+      openstack_config: *openstack_config
+      image: { get_input: image_vpgw_2 }
+      flavor: { get_input: flavor_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: openstack.nova_plugin.server.create
+          inputs:
+            args:
+              default:
+                image: { get_input: image_vpgw_2 }
+                flavor: { get_input: flavor_name }
+                userdata: { get_attribute: [ vpgw_cloud_config, cloud_config ] }
+    relationships:
+      - target: my-openstack-keypair
+        type: cloudify.openstack.server_connected_to_keypair
+      - target: heat_vpgw_2_net_mgmt_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: heat_vpgw_2_net_b_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: heat_vpgw_2_net_gw_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: heat_vpgw_2_net_a_port
+        type: cloudify.openstack.server_connected_to_port
+      - type: cloudify.relationships.depends_on
+        target: vpgw_cloud_config
+
+  vpgw_cloud_config:
+    type: cloudify.nodes.CloudInit.CloudConfig
+    properties:
+      resource_config:
+        users:
+        - name: ubuntu
+          groups: sudo
+          shell: /bin/bash
+          sudo: ['ALL=(ALL) NOPASSWD:ALL']
+          ssh-authorized-keys:
+          - { get_input: agent_key_public }
+        write_files:
+        - path: /home/ubuntu/file.txt
+          owner: ubuntu:ubuntu
+          permissions: '0444'
+          content: |
+            [mariadb]
+            name = MariaDB
+            baseurl = http://yum.mariadb.org/10.1/centos7-amd64
+            gpgkey=https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
+            gpgcheck=1
+        runcmd:
+#        - echo "epc-enablers_cloud_config" > /root/epc-enablers_cloud_config.txt
+        - [ip, l, set, ens4, up]
+        - [dhclient, ens4]
+        - [ip, l, set, eth5, up]
