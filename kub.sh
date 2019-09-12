@@ -4,16 +4,19 @@ user=ubuntu
 nt=2            #nodes total:
 export ver='=1.15.3-00'
 #1.13.1-00   #kube version
-node0='node0'
-node0_ip='192.168.122.108'
-node1='node1'
-node0_ip='192.168.122.108'
+node0='master'
+node0_ip='192.168.122.207'
+node1='node01'
+node1_ip='192.168.122.60'
+node2='node02'
+node2_ip='192.168.122.25'
 
 #nodes IP
-sudo bash -c 'cat << EOF >> /etc/hosts
+sudo bash -c "cat << EOF >> /etc/hosts
 $node0_ip $node0
 $node1_ip $node1
-EOF'
+$node2_ip $node2
+EOF"
 
 sudo swapoff -a
 sudo modprobe br_netfilter
@@ -49,7 +52,8 @@ sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
 EOF
 
 chmod +x kube_node_install.sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'bash -s' < kube_node_install.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'bash -s' < kube_node_install.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'bash -s' < kube_node_install.sh
 ########################
 
 sudo kubeadm init --pod-network-cidr=192.168.0.0/16 | tee token.log
@@ -71,5 +75,5 @@ fi
 
 sudo kubectl apply -f https://docs.projectcalico.org/v2.0/getting-started/kubernetes/installation/hosted/kubeadm/calico.yaml
 
-sleep 15 && sudo kubectl get pods --all-namespaces
-sleep 15 && sudo kubectl get nodes
+sleep 25 && sudo kubectl get pods --all-namespaces
+sleep 25 && sudo kubectl get nodes
