@@ -1,0 +1,75 @@
+#!/bin/bash
+exec 1>log.log 2>&1
+user=ubuntu
+nt=2            #nodes total:
+export ver='=1.15.3-00'
+#1.13.1-00   #kube version
+node0='node0'
+node0_ip='192.168.122.108'
+node1='node1'
+node0_ip='192.168.122.108'
+
+#nodes IP
+sudo bash -c 'cat << EOF >> /etc/hosts
+$node0_ip $node0
+$node1_ip $node1
+EOF'
+
+sudo swapoff -a
+sudo modprobe br_netfilter
+sudo sysctl net.bridge.bridge-nf-call-arptables=1
+sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
+sudo sysctl net.bridge.bridge-nf-call-iptables=1
+
+git clone https://github.com/denjuve/scripts.git 
+bash scripts/docker_install.sh kub
+
+sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+sudo bash -c 'echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list'
+
+sudo apt-get update -y
+sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
+
+########################
+#scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -r $source $user@$host:$destination
+
+cat <<EOF > kube_node_install.sh
+#!/bin/bash
+sudo swapoff -a
+sudo modprobe br_netfilter
+sudo sysctl net.bridge.bridge-nf-call-arptables=1
+sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
+sudo sysctl net.bridge.bridge-nf-call-iptables=1
+git clone https://github.com/denjuve/scripts.git 
+bash scripts/docker_install.sh
+sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update -y
+sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
+EOF
+
+chmod +x kube_node_install.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'bash -s' < kube_node_install.sh
+########################
+
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16 | tee token.log
+sudo cat token.log | grep "kubeadm join " > token.get
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+if [ $nt == 1 ]
+then
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'token.get'
+else
+for h in node0-{0..$nt}
+do
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@$h 'token.get'
+done
+fi
+
+sudo kubectl apply -f https://docs.projectcalico.org/v2.0/getting-started/kubernetes/installation/hosted/kubeadm/calico.yaml
+
+sleep 15 && sudo kubectl get pods --all-namespaces
+sleep 15 && sudo kubectl get nodes

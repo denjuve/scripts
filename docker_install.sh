@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if [  -n "$(uname -rv | grep -i ubuntu)" ]; then
 sudo apt-get remove docker docker-engine docker.io -y
 sudo apt-get update
@@ -16,8 +17,14 @@ sudo add-apt-repository \
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
 sudo apt-get update
-#sudo apt install -y docker-ce=18.06.1~ce~3-0~ubuntu
-sudo apt-get install docker-ce -y
+#18.06.1~ce~3-0~ubuntu
+if [ -z "$1" ]
+then
+sudo apt-get install -y docker-ce
+else
+sudo apt install -y docker-ce=17.03.2~ce-0~ubuntu-xenial
+fi
+
 
 else
 sudo yum remove -y docker \

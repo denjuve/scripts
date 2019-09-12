@@ -1,7 +1,6 @@
 #!/bin/bash
 vm_os=ubuntu
-centos
-ubuntu #ubuntu or centos
+#ubuntu or centos
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
 node=s01
@@ -192,4 +191,4 @@ net_args="--network bridge=${net_bridge},model=virtio"
 
     update_public_network
 
-    virsh start "${node}"
+    virsh start "${node}" --console
