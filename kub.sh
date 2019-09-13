@@ -5,11 +5,11 @@ nt=2            #nodes total:
 export ver='=1.15.3-00'
 #1.13.1-00   #kube version
 node0='master'
-node0_ip='192.168.122.166'
+node0_ip='192.168.122.766'
 node1='node01'
-node1_ip='192.168.122.60'
+node1_ip='192.168.122.27'
 node2='node02'
-node2_ip='192.168.122.25'
+node2_ip='192.168.122.226'
 
 #nodes IP
 sudo bash -c "cat << EOF >> /etc/hosts
@@ -52,32 +52,32 @@ sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
 EOF
 
 chmod +x kube_node_install.sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < kube_node_install.sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < kube_node_install.sh
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < kube_node_install.sh
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < kube_node_install.sh
 ########################
 
 sudo kubeadm init --pod-network-cidr=192.168.0.0/16 | tee token.log
 sudo cat token.log | grep -A 2 "kubeadm join " > token.get
 
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < token.get
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < token.get
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < token.get
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < token.get
 
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-if [ $nt == 1 ]
-then
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'token.get'
-else
-for h in node0-{0..$nt}
-do
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@$h 'token.get'
-done
-fi
+#if [ $nt == 1 ]
+#then
+#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'token.get'
+#else
+#for h in node0-{0..$nt}
+#do
+#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@$h 'token.get'
+#done
+#fi
 
-sudo kubectl apply -f kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+sudo kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
 
 sleep 25 && sudo kubectl get pods --all-namespaces
 sleep 25 && sudo kubectl get nodes
