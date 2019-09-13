@@ -5,7 +5,7 @@ nt=2            #nodes total:
 export ver='=1.15.3-00'
 #1.13.1-00   #kube version
 node0='master'
-node0_ip='192.168.122.207'
+node0_ip='192.168.122.166'
 node1='node01'
 node1_ip='192.168.122.60'
 node2='node02'
@@ -44,7 +44,7 @@ sudo sysctl net.bridge.bridge-nf-call-arptables=1
 sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
 sudo sysctl net.bridge.bridge-nf-call-iptables=1
 git clone https://github.com/denjuve/scripts.git 
-bash scripts/docker_install.sh
+sudo bash scripts/docker_install.sh kube
 sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
 sudo apt-get update -y
@@ -52,12 +52,16 @@ sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
 EOF
 
 chmod +x kube_node_install.sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'bash -s' < kube_node_install.sh
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'bash -s' < kube_node_install.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < kube_node_install.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < kube_node_install.sh
 ########################
 
 sudo kubeadm init --pod-network-cidr=192.168.0.0/16 | tee token.log
-sudo cat token.log | grep "kubeadm join " > token.get
+sudo cat token.log | grep -A 2 "kubeadm join " > token.get
+
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < token.get
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < token.get
+
 
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -73,7 +77,7 @@ ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@$h 'toke
 done
 fi
 
-sudo kubectl apply -f https://docs.projectcalico.org/v2.0/getting-started/kubernetes/installation/hosted/kubeadm/calico.yaml
+sudo kubectl apply -f kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
 
 sleep 25 && sudo kubectl get pods --all-namespaces
 sleep 25 && sudo kubectl get nodes
