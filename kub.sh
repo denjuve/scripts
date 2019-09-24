@@ -5,7 +5,7 @@ nt=2            #nodes total:
 export ver='=1.15.3-00'
 #1.13.1-00   #kube version
 node0='master'
-node0_ip='192.168.122.766'
+node0_ip='192.168.122.76'
 node1='node01'
 node1_ip='192.168.122.27'
 node2='node02'
