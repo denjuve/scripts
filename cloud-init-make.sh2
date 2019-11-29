@@ -1,26 +1,6 @@
 #!/bin/bash
-##############################################################################
-# BEGIN of usage description
-usage ()
-{
-cat << EOF
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-$(echo "sudo $(basename "$0") -n [node_name] -r [ram(MB)] -c [cpu count] -u [ubuntu | centos] (default - ubuntu) | -h [this hint]")
-$(echo "OPTIONS:
-  -n  created node hostname
-  -r  RAM 
-  -c  cpu count
-  -u  username and OS * Optional default option - ubuntu"
-)
+source libs.sh
 
-Example:
-$(echo "sudo $(basename "$0") -n node1 -r 5000 -c 3") 
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-EOF
-}
-# END of usage description
-
-#vm_os=ubuntu  #ubuntu or centos
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
 
@@ -36,7 +16,6 @@ do
             cpu="${OPTARG}"             ;;
         u)
             vm_os="${OPTARG}"             ;;
-
         h)
             usage
             exit 0            ;;
@@ -47,26 +26,16 @@ done
 
 # Validate arguments are set
 if [ -z "${node}" ] || [ -z "${ram}" ] || [ -z "${cpu}" ]; then
-node=node0x
-ram=15000
-cpu=2
+  node=node0x
+  ram=15000
+  cpu=2
 fi
 if [ -z "${vm_os}" ]; then
-vm_os=ubuntu
+  vm_os=ubuntu
 fi
 
 net_name='default'
 net_bridge=virbr0
-
-function update_public_network {
-     # set static ip address for node    \/ change this
-cmac=$(virsh domiflist ${node} | awk '/virbr0/ {print $5; exit}')
-echo $cmac; echo $IP_ADDR
-virsh net-update "${net_name}" add ip-dhcp-host \
-    "<host mac='${cmac}' ip='${IP_ADDR}'/>" --live --config
-}
-#    "<host mac='${cmac}' name='${node}' ip='${IP_ADDR}'/>" --live --config
-
 
 if [[ "$vm_os" == "ubuntu" ]]
 then
@@ -77,47 +46,8 @@ base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericClou
 image1="CentOS-7-x86_64-GenericCloud.qcow2"
 fi
 
-function prepare_vms {
-  local base_image=$1; shift
-  local image_dir=$1; shift
-  local image="$image1"
-  local vcp_image=${image%.*}_vcp.img
-  local _o=${base_image/*\/}
-  local _tmp
-
-function get_base_image {
-local base_image=$1
-local image_dir=$2
-wget --progress=dot:giga -P "${image_dir}" -N "${base_image}"
-}
-      get_base_image "${base_image}" "${image_dir}"
-    ./create-config-drive.sh -k ~/.ssh/id_rsa.pub \
-       -u "${user_data}" -h "${node}" "${image_dir}/${node}.iso"
-    cp "${image_dir}/${image}" "${image_dir}/${node}.qcow2"
-    qemu-img resize "${image_dir}/${node}.qcow2" 100G
-}
-
     prepare_vms "${base_image}" "${STORAGE_DIR}" "${virtual_repos_pkgs}" \
       "${virtual_nodes[@]}"
-
-function create_vms {
-  local image_dir=$1; shift
-
-net_args="--network bridge=${net_bridge},model=virtio"
-# --network bridge=ub16,model=virtio"
-#--network bridge=ub16,model=virtio"
-#--network bridge=virbr0,model=virtio --network bridge=virbr0,model=virtio --network bridge=mngbr0,model=virtio"
-
-    virt-install --name "${node}" \
-    --ram "${ram}" --vcpus "${cpu}" \
-    --cpu host-passthrough --accelerate ${net_args} \
-    --disk path="${image_dir}/${node}.qcow2",format=qcow2,bus=virtio,cache=none,io=native \
-    --os-type linux --os-variant none \
-    --boot hd --vnc --console pty --autostart --noreboot \
-    --disk path="${image_dir}/${node}.iso",device=cdrom \
-    --noautoconsole \
-    ${virt_extra_args}
-}
 
     create_vms "${STORAGE_DIR}" "${virtual_nodes_data}" "${OPNFV_BRIDGES[@]}"
 
