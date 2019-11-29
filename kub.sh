@@ -44,9 +44,6 @@ done
 sudo kubeadm init --pod-network-cidr=10.244.0.0/16 | tee token.log
 sudo cat token.log | grep -A 2 "kubeadm join " > token.get
 
-#ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node1_ip} 'sudo bash -s' < token.get
-#ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node2_ip} 'sudo bash -s' < token.get
-
 for ((i = 2; i <= nt; i++)); do
 ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@node0${i} 'sudo bash -s' < kube_node_install.sh
 done
@@ -54,16 +51,6 @@ done
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-#if [ $nt == 1 ]
-#then
-#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@${node0_ip} 'token.get'
-#else
-#for h in node0-{0..$nt}
-#do
-#ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@$h 'token.get'
-#done
-#fi
 
 kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/2140ac876ef134e0ed5af15c65e414cf26827915/Documentation/kube-flannel.yml
 
