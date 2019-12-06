@@ -42,11 +42,18 @@ fi
 
 #if [ -z "${ip_addr}" ]; then; ip_addr=10.77.101.100; fi
 if [ -n "${NETWORK}" ] && [[ $NETWORK != "default" ]]; then
-subnet=77
-for ((i = 1; i <= $NETWORK; i++)); do
-SUBS+=($subnet)
-subnet=$((subnet+11))
-done
+  subnet=77
+  for ((i = 1; i <= $NETWORK; i++)); do
+    SUBS+=($subnet)
+    subnet=$((subnet+11))
+  done
+elif [ -z "${NETWORK}" ] && [ -z "${ip_addr}" ]; then
+  subnet=77
+  SUBS+=($subnet)
+  ip_addr=10.77.101.100
+elif [ -z "${NETWORK}" ] && [ -n "${ip_addr}" ]; then
+  subnet=77
+  SUBS+=($subnet)
 fi
 
 if [[ "$vm_os" == "ubuntu" ]]
@@ -60,6 +67,7 @@ fi
 
     create_networks "${SUBS[@]}"
 
+
     prepare_vms "${base_image}" "${STORAGE_DIR}" "${virtual_repos_pkgs}" \
       "${virtual_nodes[@]}"
 
@@ -68,4 +76,4 @@ fi
 
     update_public_network $ip_addr
 
-    virsh start "${node}" --console
+#    virsh start "${node}" --console

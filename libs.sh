@@ -9,7 +9,7 @@ $(echo "OPTIONS:
   -r  RAM (MB) 
   -c  cpu count
   -u  username and OS * Optional default option - ubuntu
-  -i  ip address for ctreated net (only in single net case) default value is 10.77.101.100
+  -i  ip address for ctreated net (only in single/defaul net mode) default value is 10.77.101.100 
   -N  attached network options: default is for default libvirt network, number 2..18 is for attached networks quantity
 ")
 
@@ -41,6 +41,7 @@ function prepare_vms {
 }
 
 function create_networks {
+
   if [[ $NETWORK == "default" ]]; then
     echo "Default network specified, no net cration needed"
   else
@@ -72,9 +73,11 @@ fi
 }
 
 function create_vms {
+
   local image_dir=$1; shift
   if [[ $NETWORK == "default" ]]; then
     net_args="--network bridge=virbr0,model=virtio"
+
   else
     NET_ARGS=()
     for net_a in ${cn_net[@]}; do
@@ -96,34 +99,27 @@ function create_vms {
 }
 
 function update_public_network {
-
-  ##for net in ${ARRAY[@]}; do
-  # !!!Default network options
-  if [[ $NETWORK == "default" ]]; then
-    cmac=$(virsh domiflist ${node} |grep default | awk '{print $5}')
-    echo "mac: $cmac"; echo "ip: $ip_addr"
-  elif [[ $NETWORK == "default" ]] && [ -n "${ip_addr}" ]; then
-    cmac=$(virsh domiflist ${node} |grep default | awk '{print $5}')
-    virsh net-update ${net} add ip-dhcp-host \
+# !!!Default network options
+  if [[ $NETWORK == "default" ]] && [ -n "${ip_addr}" ]; then
+    cmac=$(virsh domiflist ${node} |grep virbr0 | awk '{print $5}')
+    virsh net-update default add ip-dhcp-host \
         "<host mac='${cmac}' ip='${ip_addr}'/>" --live --config
-  
-  # !!!Custom IP in a single arbitrary network***
+
+  elif [[ $NETWORK == "default" ]]; then
+    cmac=$(virsh domiflist ${node} |grep virbr0 | awk '{print $5}')
+    echo "mac: $cmac"
+
+# !!!Custom IP in a single arbitrary network***
   elif [ -n "${ip_addr}" ] && [ ${#cn_net[@]} == 1 ]; then
-  ARRAY=()
-  for i in ${cn_net[@]}; do
-    echo "net${i} is: $i"; ARRAY+=(10.${i}.101.100)
-  done
-  echo "nets are: ${cn_net[@]}";echo "IP(s) in nets are ${ARRAY[@]}"
     local ip_addr=$1
     cmac=$(virsh domiflist ${node} |grep "${cn_net[0]}" | awk '{print $5}')   #cmac=$(virsh domiflist ${node} | awk 'FNR == 3 {print $5}')
     echo "mac: $cmac"; echo "ip: $ip_addr"
     virsh net-update ${net} add ip-dhcp-host \
         "<host mac='${cmac}' ip='${ip_addr}'/>" --live --config
   else
-  ##done
-  # !!!Arbitrary quantity of networks (up to 18) predefined (hardcoded) .100 IPs
+# !!!Arbitrary quantity of networks (up to 18) predefined (hardcoded) .100 IPs
   ARRAY=()
-  for i in ${cn_net[@]}; do
+  for i in "${cn_net[@]}"; do
     echo "net${i} is: $i"; ARRAY+=(10.${i}.101.100)
   done
   echo "nets are: ${cn_net[@]}";echo "IP(s) in nets are ${ARRAY[@]}"
