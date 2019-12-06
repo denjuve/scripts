@@ -1,46 +1,52 @@
 #!/bin/bash
-exec 1>log.log 2>&1
+#exec 1>log.log 2>&1
 user=ubuntu
 nt=3            #nodes total:
 ver='=1.15.3-00'
 
-node1='node01'
+node1='kubenode01'
 ip_node1='10.77.101.10'
-node2='node02'
+node2='kubenode02'
 ip_node2='10.77.101.11'
-node3='node03'
+node3='kubenode03'
 ip_node3='10.77.101.12'
 
-for ((node_count = 1; node_count <= nt; node_count++)); do
-bash cloud-init-make.sh2 -n $node${node_count} -r 15000 -c 2 -i $ip_node${node_count}
-done
+#for ((node_count = 1; node_count <= nt; node_count++)); do
+#echo "node${node_count} ip_node${node_count}"
+#bash cloud-init-make.sh2 -n node0${node_count} -r 15000 -c 2 -i ip_node${node_count}
+#bash cloud-init-make.sh2 -n $node${node_count} -r 15000 -c 2 -i $ip_node${node_count}
+#bash cloud-init-make.sh2 -n $node${node_count} -r 15000 -c 2 -i $ip_node${node_count}
+#done
+bash cloud-init-make.sh2 -n $node1 -r 15000 -c 2 -i $ip_node1
+bash cloud-init-make.sh2 -n $node2 -r 15000 -c 2 -i $ip_node2
+bash cloud-init-make.sh2 -n $node3 -r 15000 -c 2 -i $ip_node3
 
-##nodes IP
-#sudo bash -c "cat << EOF >> /etc/hosts
-##for ((node_count = 1; node_count <= nt; node_count++)); do
-#$ip_node1 $node1
-#$ip_node2 $node2
-#$ip_node3 $node3
-#EOF"
-#
+
+
 #########################
-#cat <<EOF > kube_node_install.sh
-##!/bin/bash
-#sudo swapoff -a
-#sudo modprobe br_netfilter
-#sudo sysctl net.bridge.bridge-nf-call-arptables=1
-#sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
-#sudo sysctl net.bridge.bridge-nf-call-iptables=1
-#git clone https://github.com/denjuve/scripts.git 
-#if sudo docker version; then echo 'Docker installed'
-#else rm -rf /tmp/scripts-my; git clone https://github.com/denjuve/scripts.git /tmp/scripts-my
-#bash /tmp/scripts-my/docker_install.sh kube; fi
-#sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-#sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
-#sudo apt-get update
-#sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
-#EOF
-#
+cat <<EOF > kube_node_install.sh
+#!/bin/bash
+#nodes IP
+sudo bash -c "cat << EOF >> /etc/hosts
+$ip_node1 $node1
+$ip_node2 $node2
+$ip_node3 $node3
+EOF"
+sudo swapoff -a
+sudo modprobe br_netfilter
+sudo sysctl net.bridge.bridge-nf-call-arptables=1
+sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
+sudo sysctl net.bridge.bridge-nf-call-iptables=1
+git clone https://github.com/denjuve/scripts.git 
+if sudo docker version; then echo 'Docker installed'
+else rm -rf /tmp/scripts-my; git clone https://github.com/denjuve/scripts.git /tmp/scripts-my
+bash /tmp/scripts-my/docker_install.sh kube; fi
+sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
+EOF
+
 #bash kube_node_install.sh
 #for ((i = 1; i <= nt; i++)); do
 #ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@node0${i} 'sudo bash -s' < kube_node_install.sh
