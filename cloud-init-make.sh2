@@ -1,11 +1,11 @@
 #!/bin/bash
-source libs.sh
-
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
+#net_name='default'
+#net_bridge=virbr0
 
 set +x
-while getopts ":n:r:c:u:h" OPTION
+while getopts ":n:r:c:u:i:N:h" OPTION
 do
     case $OPTION in
         n)
@@ -16,6 +16,10 @@ do
             cpu="${OPTARG}"             ;;
         u)
             vm_os="${OPTARG}"             ;;
+        i)
+            ip_addr="${OPTARG}" ;;
+        N)
+            NETWORK="${OPTARG}" ;;
         h)
             usage
             exit 0            ;;
@@ -23,6 +27,8 @@ do
              echo "[ERROR] Unsupported arg, see -h for help"            ;;
     esac
 done
+
+source libs.sh
 
 # Validate arguments are set
 if [ -z "${node}" ] || [ -z "${ram}" ] || [ -z "${cpu}" ]; then
@@ -34,8 +40,14 @@ if [ -z "${vm_os}" ]; then
   vm_os=ubuntu
 fi
 
-net_name='default'
-net_bridge=virbr0
+#if [ -z "${ip_addr}" ]; then; ip_addr=10.77.101.100; fi
+if [ -n "${NETWORK}" ] && [[ $NETWORK != "default" ]]; then
+subnet=77
+for ((i = 1; i <= $NETWORK; i++)); do
+SUBS+=($subnet)
+subnet=$((subnet+11))
+done
+fi
 
 if [[ "$vm_os" == "ubuntu" ]]
 then
@@ -46,37 +58,14 @@ base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericClou
 image1="CentOS-7-x86_64-GenericCloud.qcow2"
 fi
 
-#functions create_networks {
-#local cn_net=_net0
-#br-ctl addbr ${cn_net}
-#cat < EOF > ${cn_net}.xml
-#<network>
-#  <name>${cn_net}</name>
-#  <uuid>$(uuidgen)</uuid>
-#  <forward mode='nat'>
-#    <nat>
-#      <port start='1024' end='65535'/>
-#    </nat>
-#  </forward>
-#  <bridge name='"${cn_net}"' stp='on' delay='0'/>
-#  <mac address='$(openssl rand -hex 6 | sed 's/\(..\)/\1:/g; s/:$//')'/>
-#  <ip address='10.77.101.1' netmask='255.255.255.0'>
-#    <dhcp>
-#      <range start='10.77.101.2' end='10.77.101.254'/>
-#    </dhcp>
-#  </ip>
-#</network>
-#EOF
-#virsh net-define ${cn_net}.xml
-#virsh net-autostart ${cn_net}
-#virsh net-start ${cn_net}
-#}
+    create_networks "${SUBS[@]}"
 
     prepare_vms "${base_image}" "${STORAGE_DIR}" "${virtual_repos_pkgs}" \
       "${virtual_nodes[@]}"
 
+
     create_vms "${STORAGE_DIR}" "${virtual_nodes_data}" "${OPNFV_BRIDGES[@]}"
 
-#    update_public_network
+    update_public_network $ip_addr
 
     virsh start "${node}" --console
