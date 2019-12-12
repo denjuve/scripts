@@ -76,4 +76,5 @@ fi
 
     update_public_network $ip_addr
 
-    virsh start "${node}" --console
+    virsh start "${node}"
+# --console

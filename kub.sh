@@ -4,40 +4,39 @@ user=ubuntu
 nt=3            #nodes total:
 ver='=1.15.3-00'
 
-node1='kubenode01'
-ip_node1='10.77.101.10'
-node2='kubenode02'
-ip_node2='10.77.101.11'
-node3='kubenode03'
-ip_node3='10.77.101.12'
+arr_na=()
+arr_ip=()
 
-#for ((node_count = 1; node_count <= nt; node_count++)); do
-#echo "node${node_count} ip_node${node_count}"
-#bash cloud-init-make.sh2 -n node0${node_count} -r 15000 -c 2 -i ip_node${node_count}
-#bash cloud-init-make.sh2 -n $node${node_count} -r 15000 -c 2 -i $ip_node${node_count}
-#bash cloud-init-make.sh2 -n $node${node_count} -r 15000 -c 2 -i $ip_node${node_count}
-#done
-bash cloud-init-make.sh2 -n $node1 -r 15000 -c 2 -i $ip_node1
-bash cloud-init-make.sh2 -n $node2 -r 15000 -c 2 -i $ip_node2
-bash cloud-init-make.sh2 -n $node3 -r 15000 -c 2 -i $ip_node3
+for ((i = 1; i <=$nt; i++)); do
+arr_na+=(node${i})
+arr_ip+=(10.77.101.1${i})
+done
 
+for ((n_c = 0; n_c < nt; n_c++)); do
+bash cloud-init-make.sh2 -n "${arr_na[n_c]}" -r 15000 -c 2 -i "${arr_ip[n_c]}"
+done
 
+for ((pt = 0; pt < nt; pt++)); do
+until ping -c 2 "${arr_ip[pt]}"; do
+echo "."
+done
+done
 
-#########################
+##########################
 cat <<EOF > kube_node_install.sh
 #!/bin/bash
 #nodes IP
-sudo bash -c "cat << EOF >> /etc/hosts
-$ip_node1 $node1
-$ip_node2 $node2
-$ip_node3 $node3
-EOF"
+#sudo bash -c "cat << EOF >> /etc/hosts
+#$ip_node1 $node1
+#$ip_node2 $node2
+#$ip_node3 $node3
+#EOF"
 sudo swapoff -a
 sudo modprobe br_netfilter
 sudo sysctl net.bridge.bridge-nf-call-arptables=1
 sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
 sudo sysctl net.bridge.bridge-nf-call-iptables=1
-git clone https://github.com/denjuve/scripts.git 
+#git clone https://github.com/denjuve/scripts.git 
 if sudo docker version; then echo 'Docker installed'
 else rm -rf /tmp/scripts-my; git clone https://github.com/denjuve/scripts.git /tmp/scripts-my
 bash /tmp/scripts-my/docker_install.sh kube; fi
@@ -47,24 +46,25 @@ sudo apt-get update
 sudo apt-get install -y kubelet${ver} kubectl${ver} kubeadm${ver}
 EOF
 
+
+
 #bash kube_node_install.sh
-#for ((i = 1; i <= nt; i++)); do
-#ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@node0${i} 'sudo bash -s' < kube_node_install.sh
-#done
+for ((j = 0; j < nt; j++)); do
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[j]}" 'sudo bash -s' < kube_node_install.sh
+done
 #########################
+
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}" 'sudo kubeadm init --pod-network-cidr=10.244.0.0/16 | tee token.log'
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}" 'cat token.log | grep -A 2 "kubeadm join " | tee token.get'
+scp -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}":~/token.get token.get
+
+for ((j = 1; j < nt; j++)); do
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[j]}" 'sudo bash -s' < token.get
+done
+
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}" 'mkdir -p $HOME/.kube; sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config; sudo chown $(id -u):$(id -g) $HOME/.kube/config'
 #
-#sudo kubeadm init --pod-network-cidr=10.244.0.0/16 | tee token.log
-#sudo cat token.log | grep -A 2 "kubeadm join " > token.get
+
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}" 'kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/2140ac876ef134e0ed5af15c65e414cf26827915/Documentation/kube-flannel.yml'
 #
-#for ((i = 2; i <= nt; i++)); do
-#ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@node0${i} 'sudo bash -s' < kube_node_install.sh
-#done
-#
-#mkdir -p $HOME/.kube
-#sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-#sudo chown $(id -u):$(id -g) $HOME/.kube/config
-#
-#kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/2140ac876ef134e0ed5af15c65e414cf26827915/Documentation/kube-flannel.yml
-#
-#sleep 25 && sudo kubectl get pods --all-namespaces
-#sleep 25 && sudo kubectl get nodes
+ssh -i key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${user}@"${arr_ip[0]}" 'sleep 25 && sudo kubectl get pods --all-namespaces; sleep 25 && sudo kubectl get nodes'
