@@ -132,3 +132,46 @@ function update_public_network {
     done
   fi
 }
+
+
+
+# Validate arguments are set
+function validate_args {
+if [ -z "${node}" ] || [ -z "${ram}" ] || [ -z "${cpu}" ]; then
+  node=node0x
+  ram=15000
+  cpu=2
+fi
+if [ -z "${vm_os}" ]; then
+  vm_os=ubuntu
+fi
+}
+
+#Network addresses (and names) algorithm
+function net_alg {
+if [ -n "${NETWORK}" ] && [[ $NETWORK != "default" ]]; then
+  subnet=77
+  for ((i = 1; i <= $NETWORK; i++)); do
+    SUBS+=($subnet)
+    subnet=$((subnet+11))
+  done
+elif [ -z "${NETWORK}" ] && [ -z "${ip_addr}" ]; then
+  subnet=77
+  SUBS+=($subnet)
+  ip_addr=10.77.101.100
+elif [ -z "${NETWORK}" ] && [ -n "${ip_addr}" ]; then
+  subnet=77
+  SUBS+=($subnet)
+fi
+}
+
+function choose_os {
+if [[ "$vm_os" == "ubuntu" ]]
+then
+base_image="https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
+image1="xenial-server-cloudimg-amd64-disk1.img"
+else
+base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
+image1="CentOS-7-x86_64-GenericCloud.qcow2"
+fi
+}

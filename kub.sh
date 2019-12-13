@@ -8,7 +8,8 @@ arr_na=()
 arr_ip=()
 
 for ((i = 1; i <=$nt; i++)); do
-arr_na+=(node${i})
+arr_na+=(node$[i])
+echo "${arr_na[i]}" > /tmp/vms_kub"${arr_na[@]}" ######## for cleaning ############
 arr_ip+=(10.77.101.1${i})
 done
 

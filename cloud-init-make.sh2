@@ -1,10 +1,7 @@
 #!/bin/bash
 STORAGE_DIR="/home/virt-vm-local"
 image_dir="/home/virt-vm-local"
-#net_name='default'
-#net_bridge=virbr0
 
-set +x
 while getopts ":n:r:c:u:i:N:h" OPTION
 do
     case $OPTION in
@@ -30,31 +27,9 @@ done
 
 source libs.sh
 
-# Validate arguments are set
-if [ -z "${node}" ] || [ -z "${ram}" ] || [ -z "${cpu}" ]; then
-  node=node0x
-  ram=15000
-  cpu=2
-fi
-if [ -z "${vm_os}" ]; then
-  vm_os=ubuntu
-fi
-
-#if [ -z "${ip_addr}" ]; then; ip_addr=10.77.101.100; fi
-if [ -n "${NETWORK}" ] && [[ $NETWORK != "default" ]]; then
-  subnet=77
-  for ((i = 1; i <= $NETWORK; i++)); do
-    SUBS+=($subnet)
-    subnet=$((subnet+11))
-  done
-elif [ -z "${NETWORK}" ] && [ -z "${ip_addr}" ]; then
-  subnet=77
-  SUBS+=($subnet)
-  ip_addr=10.77.101.100
-elif [ -z "${NETWORK}" ] && [ -n "${ip_addr}" ]; then
-  subnet=77
-  SUBS+=($subnet)
-fi
+validate_args
+net_alg
+choose_os
 
 if [[ "$vm_os" == "ubuntu" ]]
 then
