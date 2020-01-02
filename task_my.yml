@@ -1,0 +1,268 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+description: >
+  This Blueprint installs the nodecellar application behind an haproxy instance on an openstack cloud environment.
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.3/types.yaml
+  - plugin:cloudify-openstack-plugin
+  - plugin:cloudify-utilities-plugin
+  - plugin:cloudify-diamond-plugin
+
+inputs:
+
+  username:
+    description: OS_USERNAME as specified in Openstack RC file.
+    default: dkucherenko
+
+  password:
+    description: Openstack user password.
+    default: { get_secret: password}
+
+  project_id:
+    default: 7ebbda90a93144a38f7835bbec924557
+
+  tenant_name:
+    description: OS_TENANT_NAME as specified in Openstack RC file.
+    default: dkucherenko
+
+  auth_url:
+    description: OS_AUTH_URL as specified in Openstack RC file.
+    default: https://horizon-eu.ssl.mirantis.net:5000/v3
+
+  user_domain_name:
+    default: ldap
+
+  region:
+    description: OS_REGION_NAME as specified in Openstack RC file.
+    default: "RegionOne"
+
+  agent_key_private:
+    description: >
+      The content of the agent's private key.
+    default: { get_secret: agent_key_private }
+
+  agent_key_public:
+    description: >
+      The content of the agent's public key.
+    default: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDyESKLSmHhXZwtRfSeIc9ZZ1ARP0kxEcDBqRO84jVGB+pw9UXqynrpeFVA7tib9GYSxIDmRj8xbU9BSUX/rvktx/vzBS8yKwYeATY3ncuPwf6tQIWsz0dKLJmQAzlsz4U7qsJvedAxxEuPBorwyfuILzHA355GOjnecfeKN3HPTscGbIBdQyRDnww8VAk0O+uaGx6DCbOYQFSpz7lNt4+eIBoAKdjYAdOTq4mCNdl0g/qH2OP/ria4x00c56DoP5A4xeekL6T6QTxsqEvHVi/TNSnjD9ch9wDqcSPyey7W60qL/No3r+dB4Mx0QwM2F92C77vhLqJfUFAx6g9eCieh
+#{ get_secret: agent_key_public }
+
+  agent_user:
+    description: >
+      The username of the agent running on the instance created from the image.
+    default: ubuntu
+
+  image:
+    description: >
+      An Openstack Image ID. Tested with a Ubuntu 14.04 image.
+    type: string
+    default: '7f2ce3af-e0bb-451e-bd08-eacc74dcfe82'
+
+  flavor:
+    description: >
+      An Openstack Flavor ID.
+    default: 'ca552923-fbe9-4627-b68d-1330550000b2'
+
+  manager_network:
+    default: external
+
+  network_deployment_name:
+    default: openstack-example-network
+
+  use_existing_network_deployment:
+    default: true
+
+dsl_definitions:
+
+  openstack_config: &openstack_config
+    username: { get_input: username }
+    password: { get_input: password }
+    project_id: { get_input: project_id }
+    auth_url: { get_input: auth_url }
+    region: { get_input: region }
+    user_domain_name: { get_input: user_domain_name }
+
+node_types:
+  my.nodes.vm:
+    derived_from: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        default:
+#          network: { get_input: manager_network }
+          install_method: init_script
+          user: { get_input: agent_user }
+          port: 22
+          key: { get_input: agent_key_private }
+      server:
+        default:
+          key_name: ''
+          image: { get_input: image }
+          flavor: { get_input: flavor }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: openstack.nova_plugin.server.create
+          inputs:
+            args:
+              default:
+                image: { get_input: image }
+                flavor: { get_input: flavor }
+                userdata: { get_attribute: [ cloudify_host_cloud_config, cloud_config ] }
+
+node_templates:
+
+  cloudify_host_cloud_config:
+    type: cloudify.nodes.CloudInit.CloudConfig
+    properties:
+      resource_config:
+        users:
+        - name: { get_input: agent_user }
+          groups: sudo
+          shell: /bin/bash
+          sudo: ['ALL=(ALL) NOPASSWD:ALL']
+          ssh-authorized-keys:
+          - { get_input: agent_key_public }
+
+  vm1:
+    type: my.nodes.vm
+
+    properties:
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: cloudify_host_cloud_config
+      - target: vm1_port
+        type: cloudify.openstack.server_connected_to_port
+      - type: cloudify.relationships.depends_on
+        target: cloudify_host_cloud_config
+    interfaces:
+      cloudify.interfaces.monitoring_agent:
+          install:
+            implementation: diamond.diamond_agent.tasks.install
+            inputs:
+              diamond_config:
+                interval: 1
+          start: diamond.diamond_agent.tasks.start
+          stop: diamond.diamond_agent.tasks.stop
+          uninstall: diamond.diamond_agent.tasks.uninstall
+      cloudify.interfaces.monitoring:
+          start:
+            implementation: diamond.diamond_agent.tasks.add_collectors
+            inputs:
+              collectors_config:
+                  CPUCollector: {}
+                  MemoryCollector: {}
+                  LoadAverageCollector: {}
+                  DiskUsageCollector:
+                    config:
+                      devices: x?vd[a-z]+[0-9]*$
+                  NetworkCollector: {}
+
+  vm2:
+    type: my.nodes.vm
+    properties:
+      openstack_config: *openstack_config
+    relationships:
+      - target: vm2_port
+        type: cloudify.openstack.server_connected_to_port
+      - type: cloudify.relationships.depends_on
+        target: cloudify_host_cloud_config
+    interfaces:
+      cloudify.interfaces.monitoring_agent:
+          install:
+            implementation: diamond.diamond_agent.tasks.install
+            inputs:
+              diamond_config:
+                interval: 1
+          start: diamond.diamond_agent.tasks.start
+          stop: diamond.diamond_agent.tasks.stop
+          uninstall: diamond.diamond_agent.tasks.uninstall
+      cloudify.interfaces.monitoring:
+          start:
+            implementation: diamond.diamond_agent.tasks.add_collectors
+            inputs:
+              collectors_config:
+                  CPUCollector: {}
+                  MemoryCollector: {}
+                  LoadAverageCollector: {}
+                  DiskUsageCollector:
+                    config:
+                      devices: x?vd[a-z]+[0-9]*$
+                  NetworkCollector: {}
+
+  vm1_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: public_network
+      - type: cloudify.relationships.depends_on
+        target: public_subnet
+      - type: cloudify.openstack.port_connected_to_floating_ip
+        target: float_ip
+
+  vm2_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: public_network
+      - type: cloudify.relationships.depends_on
+        target: public_subnet
+      - type: cloudify.openstack.port_connected_to_floating_ip
+        target: float_ip
+
+#  nodecellar_ip:
+  float_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      openstack_config: *openstack_config
+      floatingip:
+        floating_network_id: { get_attribute: [ openstack, deployment, outputs, external_network ] }
+    relationships:
+    - type: cloudify.relationships.contained_in
+      target: openstack
+
+  public_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_attribute: [ openstack, deployment, outputs, public_subnet ] }
+    relationships:
+    - type: cloudify.relationships.contained_in
+      target: public_network
+
+  public_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: true
+      resource_id: { get_attribute: [ openstack, deployment, outputs, public_network ] }
+    relationships:
+    - type: cloudify.relationships.contained_in
+      target: openstack
+
+  openstack:
+    type: cloudify.nodes.DeploymentProxy
+    properties:
+      resource_config:
+        blueprint:
+          id: { get_input: network_deployment_name }
+          blueprint_archive: https://github.com/cloudify-examples/openstack-example-network/archive/master.zip
+          main_file_name: simple-blueprint.yaml
+          external_resource: { get_input: use_existing_network_deployment }
+        deployment:
+          id: { get_input: network_deployment_name }
+          outputs:
+            external_network: external_network
+            public_network_router: public_network_router
+            public_network: public_network
+            private_network: private_network
+            public_subnet: public_subnet
+            private_subnet: private_subnet
+          external_resource: { get_input: use_existing_network_deployment }
+        reexecute: false
