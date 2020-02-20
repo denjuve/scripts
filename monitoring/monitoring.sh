@@ -1,6 +1,7 @@
 #!/bin/bash
 mkdir -p /opt/5tonic_mon/{prometheus,grafana}
 mkdir -p /opt/5tonic_mon/prometheus/{conf,data}
+mkdir -p /opt/5tonic_mon/alertmanager
 chown 65534:65534 /opt/5tonic_mon/prometheus/data
 
 cat << EOF > /opt/5tonic_mon/docker-compose.yml
@@ -28,7 +29,6 @@ services:
     - /opt/5tonic_mon/grafana/datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml
     - /opt/5tonic_mon/grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml
     - /opt/5tonic_mon/grafana/dashb.json:/var/lib/grafana/dashboards/dashb.json
-#/etc/grafana/provisioning/dashboards/dashboard
     image: grafana/grafana
     environment:
 #      - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -41,10 +41,45 @@ services:
 #      - GF_SMTP_FROM_ADDRESS=myaddress@gmail.com
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-piechart-panel
 
-#networks:
-#  default:
-#    external:
-#      name: 5tonic_mon
+  alertmanager:
+    container_name: 5tonic_alertmanager
+    image: prom/alertmanager
+    ports:
+      - 9093:9093
+    volumes:
+      - /opt/5tonic_mon/alertmanager:/etc/alertmanager/
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+
+networks:
+  5tonic_mon:
+EOF
+
+cat <<EOF > /opt/5tonic_mon/alertmanager/alertmanager.yml
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'mail@gmail.com'
+  smtp_auth_username: 'mail@gmail.com'
+  smtp_auth_password: ''
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: jm-alerts
+
+  routes:
+  - match:
+      job: prometheus
+    receiver: jm-alerts
+    repeat_interval: 1h
+
+receivers:
+- name: 'jm-alerts'
+  email_configs:
+  - to: 'den.ku4er@gmail.com'
 EOF
 
 cat << EOF > /etc/systemd/system/5tonicmon.service
@@ -84,10 +119,20 @@ scrape_configs:
   - job_name: '5tonic_HW'
     static_configs:
       - targets: ['10.5.1.10:9100','10.5.1.11:9100','10.5.1.12:9100','10.5.1.14:9100','10.5.1.19:9100','10.5.1.20:9100','10.5.1.253:9100','10.5.1.254:9100']
+#EOF
+#
+#cat << EOF >> /opt/5tonic_mon/prometheus/conf/prometheus.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets: 
+        - "5tonic_alertmanager:9093"
+rule_files:
+- "alert.rules"
 EOF
 
 cat << EOF > /opt/5tonic_mon/grafana/datasource.yaml
-apiVersion: 1
 datasources:
   - name: Prometheus
     type: prometheus
@@ -97,6 +142,7 @@ EOF
 
 cp grafana.ini /opt/5tonic_mon/grafana/grafana.ini
 cp dashb.json /opt/5tonic_mon/grafana/dashb.json
+cp alert.rules /opt/5tonic_mon/prometheus/conf/alert.rules
 
 cat << EOF > /opt/5tonic_mon/grafana/dashboard.yaml
 apiVersion: 1
@@ -106,8 +152,9 @@ providers:
   folder: ''            # name of the folder to put the dashboard (http://docs.grafana.org/v5.0/reference/dashboard_folders/)
   type: 'file'          # type of dashboard description (json files)
   options:
-    folder: /var/lib/grafana/dashboards
+    folder: '/var/lib/grafana/dashboards/'
 EOF
+
 
 sudo systemctl daemon-reload
 sudo systemctl enable 5tonicmon

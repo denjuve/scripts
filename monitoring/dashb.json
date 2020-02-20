@@ -122,7 +122,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(50, 172, 45, 0.97)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 1,
       "description": "",
       "format": "s",
@@ -209,7 +209,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(50, 172, 45, 0.97)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "description": "",
       "format": "short",
       "gauge": {
@@ -294,7 +294,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 2,
       "description": "",
       "format": "percent",
@@ -381,7 +381,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 2,
       "description": "",
       "format": "percent",
@@ -468,7 +468,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 0,
       "description": "",
       "format": "percent",
@@ -551,7 +551,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 2,
       "description": "",
       "format": "short",
@@ -632,7 +632,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": null,
       "description": "",
       "format": "percent",
@@ -718,7 +718,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(245, 54, 54, 0.9)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": null,
       "description": "Get the largest partition by the variable maxmount.",
       "format": "percent",
@@ -805,7 +805,7 @@
         "rgba(237, 129, 40, 0.89)",
         "rgba(50, 172, 45, 0.97)"
       ],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": null,
       "description": "",
       "format": "bytes",
@@ -891,7 +891,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -1015,7 +1015,7 @@
         "label": "Others",
         "threshold": ""
       },
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 1,
       "fontSize": "50%",
       "format": "bytes",
@@ -1059,7 +1059,7 @@
     },
     {
       "columns": [],
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "fontSize": "120%",
       "gridPos": {
         "h": 6,
@@ -1251,7 +1251,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 2,
       "description": "node_disk_io_time_seconds_total：\nThe number of milliseconds the disk spends on input/output operations. This value is the accumulated value.（Milliseconds Spent Doing I/Os）\n\nirate(node_disk_io_time_seconds_total[1m])：\nCalculate the rate per second: (last value - last previous value) / timestamp difference, that is, the percentage of time that the disk spends on I/O operations in 1 second.",
       "fill": 1,
@@ -1294,7 +1294,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"system\"}[1m]))",
+          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"system\"}[2m]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -1303,7 +1303,7 @@
           "step": 20
         },
         {
-          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"user\"}[1m]))",
+          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"user\"}[2m]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "User",
@@ -1311,7 +1311,7 @@
           "step": 240
         },
         {
-          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"idle\"}[1m]))",
+          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"idle\"}[2m]))",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
@@ -1320,7 +1320,7 @@
           "step": 240
         },
         {
-          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"iowait\"}[1m]))",
+          "expr": "avg(irate(node_cpu_seconds_total{instance=~\"$node\",mode=\"iowait\"}[2m]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Iowait",
@@ -1328,7 +1328,7 @@
           "step": 240
         },
         {
-          "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{device}}_I/O operations per second %",
@@ -1391,7 +1391,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "decimals": 2,
       "fill": 6,
       "gridPos": {
@@ -1538,7 +1538,7 @@
       "bars": true,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "description": "Reads completed: Reads per second per disk partition\n\nWrites completed: Write completions per second for each disk partition\n\nIO now Number of input/output requests being processed per second per disk partition",
       "fill": 2,
       "gridPos": {
@@ -1580,7 +1580,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(node_disk_reads_completed_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_reads_completed_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1590,7 +1590,7 @@
           "step": 10
         },
         {
-          "expr": "irate(node_disk_writes_completed_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_writes_completed_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
@@ -1657,7 +1657,7 @@
       "bars": true,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "description": "Read bytes Number of bits read per second per disk partition\nWritten bytes Number of bits written per second per disk partition",
       "fill": 2,
       "gridPos": {
@@ -1699,7 +1699,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(node_disk_read_bytes_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_read_bytes_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -1708,7 +1708,7 @@
           "step": 10
         },
         {
-          "expr": "irate(node_disk_written_bytes_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_written_bytes_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
@@ -1766,7 +1766,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "description": "Read time ms Number of seconds per disk partition read operation\n\nWrite time ms Number of seconds spent per disk partition write operation\n\nIO time ms Number of seconds spent per disk partition input/output operation\n\nIO time weighted Weighted seconds spent per disk partition input/output operation",
       "fill": 3,
       "gridPos": {
@@ -1808,7 +1808,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": true,
           "interval": "",
@@ -1818,7 +1818,7 @@
           "step": 10
         },
         {
-          "expr": "irate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 1,
@@ -1826,7 +1826,7 @@
           "refId": "D"
         },
         {
-          "expr": "irate(node_disk_read_time_seconds_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_read_time_seconds_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1835,7 +1835,7 @@
           "refId": "B"
         },
         {
-          "expr": "irate(node_disk_write_time_seconds_total{instance=~\"$node\"}[1m])",
+          "expr": "irate(node_disk_write_time_seconds_total{instance=~\"$node\"}[2m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1889,7 +1889,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "fill": 1,
       "gridPos": {
         "h": 8,
@@ -1994,7 +1994,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "description": "CurrEstab - The number of TCP connections whose current state is ESTABLISHED or CLOSE-WAIT\n\nActiveOpens - the number of TCP average connections that have been directly converted from the CLOSED state to the SYN-SENT state (within 1 minute)\n\nPassiveOpens - has been converted directly from the LISTEN state to TCP average connection number in SYN-RCVD state (within 1 minute)\n\nTCP_alloc - Number of TCP sockets allocated (established, applied to sk_buff)\n\nTCP_inuse - TCP being used (listening) Number of sockets \n\nTCP_tw - number of TCP connections waiting to be closed",
       "fill": 0,
       "gridPos": {
@@ -2123,7 +2123,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_PROMETHEUS_111}",
+      "datasource": "Prometheus",
       "fill": 0,
       "gridPos": {
         "h": 10,
@@ -2295,7 +2295,7 @@
         "allFormat": "glob",
         "allValue": null,
         "current": {},
-        "datasource": "${DS_PROMETHEUS_111}",
+        "datasource": "Prometheus",
         "definition": "",
         "hide": 0,
         "includeAll": false,
@@ -2319,7 +2319,7 @@
         "allFormat": "glob",
         "allValue": null,
         "current": {},
-        "datasource": "${DS_PROMETHEUS_111}",
+        "datasource": "Prometheus",
         "definition": "",
         "hide": 0,
         "includeAll": false,
@@ -2343,7 +2343,7 @@
         "allFormat": "glob",
         "allValue": null,
         "current": {},
-        "datasource": "${DS_PROMETHEUS_111}",
+        "datasource": "Prometheus",
         "definition": "",
         "hide": 0,
         "includeAll": false,
@@ -2366,7 +2366,7 @@
       {
         "allValue": null,
         "current": {},
-        "datasource": "${DS_PROMETHEUS_111}",
+        "datasource": "Prometheus",
         "definition": "",
         "hide": 2,
         "includeAll": false,
