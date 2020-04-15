@@ -3,6 +3,7 @@
 if [  -n "$(uname -rv | grep -i ubuntu)" ]; then
 sudo apt-get remove docker docker-engine docker.io -y
 sudo apt-get update
+echo '* libraries/restart-without-asking boolean true' | sudo debconf-set-selections
 sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
