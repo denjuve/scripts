@@ -149,3 +149,48 @@ groups:
     annotations:
       summary: "Node overtemperature alarm (instance {{ $labels.instance }})"
       description: "Physical node temperature alarm triggered\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+##############################################
+    - alert: PrometheusJobMissing
+      expr: absent(up{job="prometheus"})
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Prometheus job missing (instance {{ $labels.instance }})
+        description: A Prometheus job has disappeared\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}
+
+  - alert: PrometheusTargetMissing
+    expr: up == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Prometheus target missing (instance {{ $labels.instance }})
+      description: A Prometheus target has disappeared. An exporter might be crashed.\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}
+
+  - alert: PrometheusAllTargetsMissing
+    expr: count by (job) (up) == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Prometheus all targets missing (instance {{ $labels.instance }})
+      description: A Prometheus job does not have living target anymore.\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}
+
+  - alert: HostSystemdServiceCrashed
+      expr: node_systemd_unit_state{state="failed"} == 1
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host SystemD service crashed (instance {{ $labels.instance }})
+        description: SystemD service crashed\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}
+
+  - alert: HostOomKillDetected
+      expr: increase(node_vmstat_oom_kill[1m]) > 0
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: Host OOM kill detected (instance {{ $labels.instance }})
+        description: OOM kill detected\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}
