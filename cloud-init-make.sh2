@@ -31,14 +31,6 @@ validate_args
 net_alg
 choose_os
 
-if [[ "$vm_os" == "ubuntu" ]]
-then
-base_image="https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img"
-image1="xenial-server-cloudimg-amd64-disk1.img"
-else
-base_image="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2"
-image1="CentOS-7-x86_64-GenericCloud.qcow2"
-fi
 
     create_networks "${SUBS[@]}"
 
@@ -51,5 +43,4 @@ fi
 
     update_public_network $ip_addr
 
-    virsh start "${node}"
-# --console
+    virsh start "${node}" --console
