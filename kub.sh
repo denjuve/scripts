@@ -36,9 +36,9 @@ sudo swapoff -a && sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 sudo modprobe br_netfilter
 echo br_netfilter >> /etc/modules
 
-echo "net.bridge.bridge-nf-call-arptables=1"  >> /etc/sysctl.conf 
-echo "net.bridge.bridge-nf-call-ip6tables=1"  >> /etc/sysctl.conf 
-echo "net.bridge.bridge-nf-call-iptables=1"  >> /etc/sysctl.conf 
+echo "net.bridge.bridge-nf-call-arptables = 1"  >> /etc/sysctl.conf 
+echo "net.bridge.bridge-nf-call-ip6tables = 1"  >> /etc/sysctl.conf 
+echo "net.bridge.bridge-nf-call-iptables = 1"  >> /etc/sysctl.conf 
 
 sudo sysctl -p
 
