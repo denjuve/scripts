@@ -32,12 +32,16 @@ cat <<EOF > kube_node_install.sh
 #$ip_node2 $node2
 #$ip_node3 $node3
 #EOF"
-sudo swapoff -a
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+sudo swapoff -a && sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 sudo modprobe br_netfilter
-sudo sysctl net.bridge.bridge-nf-call-arptables=1
-sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
-sudo sysctl net.bridge.bridge-nf-call-iptables=1
+echo br_netfilter >> /etc/modules
+
+echo "net.bridge.bridge-nf-call-arptables=1"  >> /etc/sysctl.conf 
+echo "net.bridge.bridge-nf-call-ip6tables=1"  >> /etc/sysctl.conf 
+echo "net.bridge.bridge-nf-call-iptables=1"  >> /etc/sysctl.conf 
+
+sudo sysctl -p
+
 #git clone https://github.com/denjuve/scripts.git 
 if sudo docker version; then echo 'Docker installed'
 else rm -rf /tmp/scripts-my; git clone https://github.com/denjuve/scripts.git /tmp/scripts-my
