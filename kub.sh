@@ -33,6 +33,7 @@ cat <<EOF > kube_node_install.sh
 #$ip_node3 $node3
 #EOF"
 sudo swapoff -a
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
 sudo modprobe br_netfilter
 sudo sysctl net.bridge.bridge-nf-call-arptables=1
 sudo sysctl net.bridge.bridge-nf-call-ip6tables=1
