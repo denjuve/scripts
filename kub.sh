@@ -39,8 +39,8 @@ echo br_netfilter >> /etc/modules
 echo "net.bridge.bridge-nf-call-arptables = 1"  >> /etc/sysctl.conf 
 echo "net.bridge.bridge-nf-call-ip6tables = 1"  >> /etc/sysctl.conf 
 echo "net.bridge.bridge-nf-call-iptables = 1"  >> /etc/sysctl.conf 
-
-sudo sysctl -p
+echo "net.ipv4.ip_forward = 1"  >> /etc/sysctl.conf 
+sudo sysctl -p /etc/sysctl.conf 
 
 #git clone https://github.com/denjuve/scripts.git 
 if sudo docker version; then echo 'Docker installed'
